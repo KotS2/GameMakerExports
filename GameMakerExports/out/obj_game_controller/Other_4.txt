@@ -1,0 +1,23 @@
+/// Object : obj_game_controller | Other_4
+
+
+
+
+// Oda Creation Code global.room_is_gameplay'i set etmediyse default false yap:
+if (!variable_global_exists("room_is_gameplay")) {
+    global.room_is_gameplay = false;
+}
+
+// Oda değişiminde pause menüyü kapat:
+pause_active = false;
+global.input_blocked_by_pause = false;
+"
+/// obj_game_controller.Room Start
+// Oda Creation Code global.room_is_gameplay'i set etmediyse default false yap:
+if (!variable_global_exists("room_is_gameplay")) {
+    global.room_is_gameplay = false;
+}
+
+// Oda değişiminde pause menüyü kapat:
+pause_active = false;
+global.input_blocked_by_pause = false;

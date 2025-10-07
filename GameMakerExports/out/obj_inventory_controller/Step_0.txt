@@ -1,0 +1,472 @@
+/// Object : obj_inventory_controller | Step_0
+
+
+
+
+// === HOVER NAME ===
+var mx = device_mouse_x(0);
+var my = device_mouse_y(0);
+
+// Interaktif objeye bak
+var inst = instance_position(mx, my, all);
+if (instance_exists(inst)) {
+    var obj_name = string_lower(object_get_name(inst.object_index));
+    var itm_id   = scr_get_item_id(obj_name);
+
+    // global.lang_itm sisteminden isim çek
+    var disp_name = "";
+    if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+        if (ds_map_exists(global.lang_itm, itm_id)) {
+            disp_name = global.lang_itm[? itm_id];
+            if (is_ds_map(disp_name) && ds_map_exists(disp_name, "name"))
+                disp_name = disp_name[? "name"];
+        }
+    }
+
+    // fallback (örnek: obj_tkna_bucket → "Bucket")
+    if (disp_name == "" || is_undefined(disp_name)) {
+        disp_name = string_replace_all(string_delete(obj_name, 1, 9), "_", " ");
+        disp_name = string_upper(string_char_at(disp_name, 1)) + string_delete(disp_name, 1, 1);
+    }
+
+    global.selected_item_name = disp_name;
+} else {
+    global.selected_item_name = "";
+}
+
+// === Açma/Kapama (klavye) ===
+var key_i   = ord("I");
+var key_tab = vk_tab;
+
+if (keyboard_check_pressed(key_i) || keyboard_check_pressed(key_tab)) {
+    global.inv_open = !global.inv_open;
+    global.inv_timer = global.inv_auto_sec;
+}
+
+// === Mouse position ===
+var sw = display_get_gui_width();
+var sh = display_get_gui_height();
+var bar_y = sh - global.inv_bar_height;
+mx = device_mouse_x(0);
+my = device_mouse_y(0);
+var over_gui = (my >= bar_y);
+
+// === Mouse wheel ===
+var wheel = mouse_wheel_up() - mouse_wheel_down();
+if (wheel != 0) {
+    if (global.inv_open) {
+        if (over_gui) {
+            var max_offset = max(0, ds_list_size(global.inventory) - 1);
+            if (ds_list_size(global.inventory) * (global.inv_item_size + global.inv_padding) > sw) {
+                global.inv_offset = clamp(global.inv_offset - wheel, 0, max_offset);
+                global.inv_timer = global.inv_auto_sec;
+            } else {
+                global.inv_scroll_anim = 15;
+            }
+        } else {
+            global.inv_open = false;
+        }
+    } else {
+        global.inv_open = true;
+        global.inv_timer = global.inv_auto_sec;
+    }
+}
+
+// === Auto-close ===
+if (global.inv_open) {
+    if (!over_gui) {
+        global.inv_timer--;
+        if (global.inv_timer <= 0) global.inv_open = false;
+    }
+}
+
+if (global.inv_scroll_anim > 0) global.inv_scroll_anim--;
+
+// --- ITEM SEÇİMİ ---
+if (global.inv_open) {
+    var count = ds_list_size(global.inventory);
+    var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+    var ypos  = bar_y + global.inv_padding;
+    global.hover_name_inv = "";
+
+    for (var i = 0; i < count; i++) {
+        var entry  = global.inventory[| i];
+        var itm_id = entry[0];
+
+        var rect_l = xpos;
+        var rect_t = ypos;
+        var rect_r = xpos + global.inv_item_size;
+        var rect_b = ypos + global.inv_item_size;
+
+        // Hover isim
+        if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+            if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                if (ds_map_exists(global.lang_itm, itm_id)) {
+                    var itm_entry = global.lang_itm[? itm_id];
+                    if (is_ds_map(itm_entry) && ds_map_exists(itm_entry, "name"))
+                        global.hover_name_inv = itm_entry[? "name"];
+                    else
+                        global.hover_name_inv = "?";
+                }
+            }
+        }
+
+        // Sol tık seçim
+        if (mouse_check_button_pressed(mb_left)) {
+            if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+                global.inv_selected = (global.inv_selected == i) ? -1 : i;
+            }
+        }
+
+        xpos += global.inv_item_size + global.inv_padding;
+    }
+}
+
+// --- ITEM KULLANMA ---
+if (global.inv_selected != -1 && mouse_check_button_pressed(mb_left)) {
+    if (!over_gui) {
+        var target = instance_position(mx, my, all);
+        if (target != noone) {
+            global.pending_use  = target;
+            global.pending_item = global.inventory[| global.inv_selected][0];
+        } else {
+            show_debug_message("[INFO] boş tıklandı → itm geri dönüyor");
+            global.inv_selected = -1;
+        }
+    }
+}
+
+// --- WORLD ITEM (tkna/tkny) ALMA ---
+if (global.inv_selected == -1 && mouse_check_button_pressed(mb_left)) {
+    var inst2 = instance_position(mx, my, all);
+    if (inst2 != noone) {
+        var nm2 = string_lower(object_get_name(inst2.object_index));
+        if (string_copy(nm2,1,9) == "obj_tkna_" || string_copy(nm2,1,9) == "obj_tkny_") {
+            // daima tek pending → eskisini sil, yenisini ata
+            global.pending_use     = inst2;
+            global.pending_objname = object_get_name(inst2.object_index);
+            global.pending_spr     = inst2.sprite_index;
+            global.pending_done    = false;
+            show_debug_message("[PENDING] TKNA/TKNY seçildi → " + global.pending_objname);
+        }
+    }
+}
+
+// --- ITEM DROP (sağ tık envanter) ---
+if (global.inv_selected != -1 && mouse_check_button_pressed(mb_right)) {
+    global.inv_selected = -1;
+}
+
+// === Sağ tık açıklama ===
+if (mouse_check_button_pressed(mb_right) && global.inv_selected == -1) {
+    var inst3 = instance_position(mx, my, all);
+    var desc = "";
+
+    // Önce world objesine bak
+    if (inst3 != noone) {
+        var nm = string_lower(object_get_name(inst3.object_index));
+        if (string_copy(nm,1,9) == "obj_tkna_"
+        ||  string_copy(nm,1,9) == "obj_tkny_"
+        ||  string_copy(nm,1,7) == "obj_use"
+        ||  string_copy(nm,1,7) == "obj_btn") {
+            var itm_id2 = scr_get_item_id(nm);
+            if (itm_id2 != "") {
+                if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                    if (ds_map_exists(global.lang_itm, itm_id2)) {
+                        var itm_map = global.lang_itm[? itm_id2];
+                        if (is_ds_map(itm_map) && ds_map_exists(itm_map, "desc"))
+                            desc = itm_map[? "desc"];
+                    }
+                }
+            }
+        }
+    }
+
+    // Eğer world desc bulunmadıysa, inventory itemine bak
+    if (desc == "" && global.inv_open) {
+        var count = ds_list_size(global.inventory);
+        var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+        var ypos  = bar_y + global.inv_padding;
+        for (var i = 0; i < count; i++) {
+            var entry  = global.inventory[| i];
+            var itm_id = entry[0];
+            var rect_l = xpos;
+            var rect_t = ypos;
+            var rect_r = xpos + global.inv_item_size;
+            var rect_b = ypos + global.inv_item_size;
+            if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+                if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                    if (ds_map_exists(global.lang_itm, itm_id)) {
+                        var itm_map = global.lang_itm[? itm_id];
+                        if (is_ds_map(itm_map) && ds_map_exists(itm_map, "desc"))
+                            desc = itm_map[? "desc"];
+                    }
+                }
+            }
+            xpos += global.inv_item_size + global.inv_padding;
+        }
+    }
+
+    if (desc == "" || is_undefined(desc)) desc = "?";
+
+    // Eski balonları sil
+    with (obj_speechbubble) instance_destroy();
+
+    // Yeni balon oluştur
+    var b = instance_create_layer(
+        obj_player.x,
+        obj_player.y - obj_player.head_offset,
+        "Instances",
+        obj_speechbubble
+    );
+    b.text = desc;
+    b.parent_id = obj_player;
+}
+
+// === Bildirimler (fade-out) ===
+for (var i = ds_list_size(global.notif_list)-1; i >= 0; i--) {
+    var n = global.notif_list[| i];
+    n[2]--;
+    if (n[2] <= 0) ds_list_delete(global.notif_list, i);
+    else global.notif_list[| i] = n;
+}
+"
+/// obj_inventory_controller.Step
+
+// === HOVER NAME ===
+var mx = device_mouse_x(0);
+var my = device_mouse_y(0);
+
+// Interaktif objeye bak
+var inst = instance_position(mx, my, all);
+if (instance_exists(inst)) {
+    var obj_name = string_lower(object_get_name(inst.object_index));
+    var itm_id   = scr_get_item_id(obj_name);
+
+    // global.lang_itm sisteminden isim çek
+    var disp_name = "";
+    if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+        if (ds_map_exists(global.lang_itm, itm_id)) {
+            disp_name = global.lang_itm[? itm_id];
+            if (is_ds_map(disp_name) && ds_map_exists(disp_name, "name"))
+                disp_name = disp_name[? "name"];
+        }
+    }
+
+    // fallback (örnek: obj_tkna_bucket → "Bucket")
+    if (disp_name == "" || is_undefined(disp_name)) {
+        disp_name = string_replace_all(string_delete(obj_name, 1, 9), "_", " ");
+        disp_name = string_upper(string_char_at(disp_name, 1)) + string_delete(disp_name, 1, 1);
+    }
+
+    global.selected_item_name = disp_name;
+} else {
+    global.selected_item_name = "";
+}
+
+
+// === Açma/Kapama (klavye) ===
+var key_i   = ord("I");
+var key_tab = vk_tab;
+
+if (keyboard_check_pressed(key_i) || keyboard_check_pressed(key_tab)) {
+    global.inv_open = !global.inv_open;
+    global.inv_timer = global.inv_auto_sec;
+}
+
+
+// === Mouse position ===
+var sw = display_get_gui_width();
+var sh = display_get_gui_height();
+var bar_y = sh - global.inv_bar_height;
+mx = device_mouse_x(0);
+my = device_mouse_y(0);
+var over_gui = (my >= bar_y);
+
+
+// === Mouse wheel ===
+var wheel = mouse_wheel_up() - mouse_wheel_down();
+if (wheel != 0) {
+    if (global.inv_open) {
+        if (over_gui) {
+            var max_offset = max(0, ds_list_size(global.inventory) - 1);
+            if (ds_list_size(global.inventory) * (global.inv_item_size + global.inv_padding) > sw) {
+                global.inv_offset = clamp(global.inv_offset - wheel, 0, max_offset);
+                global.inv_timer = global.inv_auto_sec;
+            } else {
+                global.inv_scroll_anim = 15;
+            }
+        } else {
+            global.inv_open = false;
+        }
+    } else {
+        global.inv_open = true;
+        global.inv_timer = global.inv_auto_sec;
+    }
+}
+
+
+// === Auto-close ===
+if (global.inv_open) {
+    if (!over_gui) {
+        global.inv_timer--;
+        if (global.inv_timer <= 0) global.inv_open = false;
+    }
+}
+
+if (global.inv_scroll_anim > 0) global.inv_scroll_anim--;
+
+
+// --- ITEM SEÇİMİ ---
+if (global.inv_open) {
+    var count = ds_list_size(global.inventory);
+    var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+    var ypos  = bar_y + global.inv_padding;
+    global.hover_name_inv = "";
+
+    for (var i = 0; i < count; i++) {
+        var entry  = global.inventory[| i];
+        var itm_id = entry[0];
+
+        var rect_l = xpos;
+        var rect_t = ypos;
+        var rect_r = xpos + global.inv_item_size;
+        var rect_b = ypos + global.inv_item_size;
+
+        // Hover isim
+        if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+            if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                if (ds_map_exists(global.lang_itm, itm_id)) {
+                    var itm_entry = global.lang_itm[? itm_id];
+                    if (is_ds_map(itm_entry) && ds_map_exists(itm_entry, "name"))
+                        global.hover_name_inv = itm_entry[? "name"];
+                    else
+                        global.hover_name_inv = "?";
+                }
+            }
+        }
+
+        // Sol tık seçim
+        if (mouse_check_button_pressed(mb_left)) {
+            if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+                global.inv_selected = (global.inv_selected == i) ? -1 : i;
+            }
+        }
+
+        xpos += global.inv_item_size + global.inv_padding;
+    }
+}
+
+
+// --- ITEM KULLANMA ---
+if (global.inv_selected != -1 && mouse_check_button_pressed(mb_left)) {
+    if (!over_gui) {
+        var target = instance_position(mx, my, all);
+        if (target != noone) {
+            global.pending_use  = target;
+            global.pending_item = global.inventory[| global.inv_selected][0];
+        } else {
+            show_debug_message("[INFO] boş tıklandı → itm geri dönüyor");
+            global.inv_selected = -1;
+        }
+    }
+}
+
+
+// --- WORLD ITEM (tkna/tkny) ALMA ---
+if (global.inv_selected == -1 && mouse_check_button_pressed(mb_left)) {
+    var inst2 = instance_position(mx, my, all);
+    if (inst2 != noone) {
+        var nm2 = string_lower(object_get_name(inst2.object_index));
+        if (string_copy(nm2,1,9) == "obj_tkna_" || string_copy(nm2,1,9) == "obj_tkny_") {
+            // daima tek pending → eskisini sil, yenisini ata
+            global.pending_use     = inst2;
+            global.pending_objname = object_get_name(inst2.object_index);
+            global.pending_spr     = inst2.sprite_index;
+            global.pending_done    = false;
+            show_debug_message("[PENDING] TKNA/TKNY seçildi → " + global.pending_objname);
+        }
+    }
+}
+
+
+// --- ITEM DROP (sağ tık envanter) ---
+if (global.inv_selected != -1 && mouse_check_button_pressed(mb_right)) {
+    global.inv_selected = -1;
+}
+
+
+// === Sağ tık açıklama ===
+if (mouse_check_button_pressed(mb_right) && global.inv_selected == -1) {
+    var inst3 = instance_position(mx, my, all);
+    var desc = "";
+
+    // Önce world objesine bak
+    if (inst3 != noone) {
+        var nm = string_lower(object_get_name(inst3.object_index));
+        if (string_copy(nm,1,9) == "obj_tkna_"
+        ||  string_copy(nm,1,9) == "obj_tkny_"
+        ||  string_copy(nm,1,7) == "obj_use"
+        ||  string_copy(nm,1,7) == "obj_btn") {
+            var itm_id2 = scr_get_item_id(nm);
+            if (itm_id2 != "") {
+                if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                    if (ds_map_exists(global.lang_itm, itm_id2)) {
+                        var itm_map = global.lang_itm[? itm_id2];
+                        if (is_ds_map(itm_map) && ds_map_exists(itm_map, "desc"))
+                            desc = itm_map[? "desc"];
+                    }
+                }
+            }
+        }
+    }
+
+    // Eğer world desc bulunmadıysa, inventory itemine bak
+    if (desc == "" && global.inv_open) {
+        var count = ds_list_size(global.inventory);
+        var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+        var ypos  = bar_y + global.inv_padding;
+        for (var i = 0; i < count; i++) {
+            var entry  = global.inventory[| i];
+            var itm_id = entry[0];
+            var rect_l = xpos;
+            var rect_t = ypos;
+            var rect_r = xpos + global.inv_item_size;
+            var rect_b = ypos + global.inv_item_size;
+            if (point_in_rectangle(mx, my, rect_l, rect_t, rect_r, rect_b)) {
+                if (variable_global_exists("lang_itm") && ds_exists(global.lang_itm, ds_type_map)) {
+                    if (ds_map_exists(global.lang_itm, itm_id)) {
+                        var itm_map = global.lang_itm[? itm_id];
+                        if (is_ds_map(itm_map) && ds_map_exists(itm_map, "desc"))
+                            desc = itm_map[? "desc"];
+                    }
+                }
+            }
+            xpos += global.inv_item_size + global.inv_padding;
+        }
+    }
+
+    if (desc == "" || is_undefined(desc)) desc = "?";
+
+    // Eski balonları sil
+    with (obj_speechbubble) instance_destroy();
+
+    // Yeni balon oluştur
+    var b = instance_create_layer(
+        obj_player.x,
+        obj_player.y - obj_player.head_offset,
+        "Instances",
+        obj_speechbubble
+    );
+    b.text = desc;
+    b.parent_id = obj_player;
+}
+
+
+// === Bildirimler (fade-out) ===
+for (var i = ds_list_size(global.notif_list)-1; i >= 0; i--) {
+    var n = global.notif_list[| i];
+    n[2]--;
+    if (n[2] <= 0) ds_list_delete(global.notif_list, i);
+    else global.notif_list[| i] = n;
+}

@@ -1,0 +1,185 @@
+/// Object : obj_nav | Draw_0
+
+
+
+
+draw_self();
+
+// MP path (sarı)
+var pn = (path != -1) ? path_get_number(path) : 0;
+if (pn > 0) {
+    draw_set_alpha(0.9);
+    draw_set_color(c_yellow);
+    draw_path(path, 0, 0, true);
+    draw_set_alpha(1);
+
+    var ex = path_get_point_x(path, pn - 1);
+    var ey = path_get_point_y(path, pn - 1);
+    draw_set_color(c_red);
+    draw_circle(ex, ey, 4, false);
+}
+
+// Sadeleştirilmiş RAY (beyaz çizgi + yeşil noktalar)
+if (is_array(nav_ray_simplified) && array_length(nav_ray_simplified) >= 2) {
+    draw_set_color(c_white);
+    var Ls = array_length(nav_ray_simplified);
+    for (var i = 0; i < Ls - 1; i++) {
+        var x1 = nav_ray_simplified[i][0];
+        var y1 = nav_ray_simplified[i][1];
+        var x2 = nav_ray_simplified[i+1][0];
+        var y2 = nav_ray_simplified[i+1][1];
+        draw_line(x1, y1, x2, y2);
+    }
+
+    draw_set_color(c_lime);
+    for (var j = 0; j < Ls; j++) {
+        draw_circle(nav_ray_simplified[j][0], nav_ray_simplified[j][1], 2, false);
+    }
+}
+
+// Halkalar
+if (dbg_show_rings && is_array(debug_trace) && array_length(debug_trace) > 0) {
+    var max_draw_i = min(max(0, debug_anim_progress - 1), array_length(debug_trace) - 1);
+    var last_ring = is_undefined(debug_trace[max_draw_i][2]) ? 0 : debug_trace[max_draw_i][2];
+
+    var cx = is_undefined(debug_center_x) ? x : debug_center_x;
+    var cy = is_undefined(debug_center_y) ? y : debug_center_y;
+
+    draw_set_color(c_aqua);
+    draw_set_alpha(0.35);
+    for (var rr = 1; rr <= last_ring; rr++) {
+        draw_circle(cx, cy, rr * cell * ring_rad_factor, true);
+    }
+    draw_set_alpha(1);
+
+    for (var q = 0; q <= max_draw_i; q++) {
+        var px = debug_trace[q][0];
+        var py = debug_trace[q][1];
+        if (q == 0) draw_set_color(c_orange);
+        else if (q == debug_hit_index) draw_set_color(c_lime);
+        else draw_set_color(c_maroon);
+        draw_circle(px, py, dbg_point_rad, false);
+    }
+}
+// === Player'a gönderilen son path (mavi) ===
+if (is_array(nav_ray_send) && array_length(nav_ray_send) >= 1) {
+    draw_set_color(c_blue);
+    var Lp = array_length(nav_ray_send);
+
+    // Çizimin başlangıcı: oyuncu varsa oyuncudan; yoksa ilk noktadan
+    var px0, py0;
+    if (instance_exists(obj_player)) {
+        var p = instance_find(obj_player, 0);
+        px0 = p.x; py0 = p.y;
+    } else {
+        px0 = nav_ray_send[0][0];
+        py0 = nav_ray_send[0][1];
+    }
+
+    // Tek nokta varsa sadece noktayı çiz, hat oluşturmaya çalışma
+    for (var k = 0; k < Lp; k++) {
+        var px1 = nav_ray_send[k][0];
+        var py1 = nav_ray_send[k][1];
+
+        // çizgi (yalnızca bir önceki başlangıçtan)
+        if (k == 0 && !(px0 == px1 && py0 == py1)) {
+            draw_line(px0, py0, px1, py1);
+        } else if (k > 0) {
+            draw_line(nav_ray_send[k-1][0], nav_ray_send[k-1][1], px1, py1);
+        }
+
+        // nokta
+        draw_circle(px1, py1, 3, false);
+    }
+}
+"
+/// obj_nav - Draw
+draw_self();
+
+// MP path (sarı)
+var pn = (path != -1) ? path_get_number(path) : 0;
+if (pn > 0) {
+    draw_set_alpha(0.9);
+    draw_set_color(c_yellow);
+    draw_path(path, 0, 0, true);
+    draw_set_alpha(1);
+
+    var ex = path_get_point_x(path, pn - 1);
+    var ey = path_get_point_y(path, pn - 1);
+    draw_set_color(c_red);
+    draw_circle(ex, ey, 4, false);
+}
+
+// Sadeleştirilmiş RAY (beyaz çizgi + yeşil noktalar)
+if (is_array(nav_ray_simplified) && array_length(nav_ray_simplified) >= 2) {
+    draw_set_color(c_white);
+    var Ls = array_length(nav_ray_simplified);
+    for (var i = 0; i < Ls - 1; i++) {
+        var x1 = nav_ray_simplified[i][0];
+        var y1 = nav_ray_simplified[i][1];
+        var x2 = nav_ray_simplified[i+1][0];
+        var y2 = nav_ray_simplified[i+1][1];
+        draw_line(x1, y1, x2, y2);
+    }
+
+    draw_set_color(c_lime);
+    for (var j = 0; j < Ls; j++) {
+        draw_circle(nav_ray_simplified[j][0], nav_ray_simplified[j][1], 2, false);
+    }
+}
+
+// Halkalar
+if (dbg_show_rings && is_array(debug_trace) && array_length(debug_trace) > 0) {
+    var max_draw_i = min(max(0, debug_anim_progress - 1), array_length(debug_trace) - 1);
+    var last_ring = is_undefined(debug_trace[max_draw_i][2]) ? 0 : debug_trace[max_draw_i][2];
+
+    var cx = is_undefined(debug_center_x) ? x : debug_center_x;
+    var cy = is_undefined(debug_center_y) ? y : debug_center_y;
+
+    draw_set_color(c_aqua);
+    draw_set_alpha(0.35);
+    for (var rr = 1; rr <= last_ring; rr++) {
+        draw_circle(cx, cy, rr * cell * ring_rad_factor, true);
+    }
+    draw_set_alpha(1);
+
+    for (var q = 0; q <= max_draw_i; q++) {
+        var px = debug_trace[q][0];
+        var py = debug_trace[q][1];
+        if (q == 0) draw_set_color(c_orange);
+        else if (q == debug_hit_index) draw_set_color(c_lime);
+        else draw_set_color(c_maroon);
+        draw_circle(px, py, dbg_point_rad, false);
+    }
+}
+// === Player'a gönderilen son path (mavi) ===
+if (is_array(nav_ray_send) && array_length(nav_ray_send) >= 1) {
+    draw_set_color(c_blue);
+    var Lp = array_length(nav_ray_send);
+
+    // Çizimin başlangıcı: oyuncu varsa oyuncudan; yoksa ilk noktadan
+    var px0, py0;
+    if (instance_exists(obj_player)) {
+        var p = instance_find(obj_player, 0);
+        px0 = p.x; py0 = p.y;
+    } else {
+        px0 = nav_ray_send[0][0];
+        py0 = nav_ray_send[0][1];
+    }
+
+    // Tek nokta varsa sadece noktayı çiz, hat oluşturmaya çalışma
+    for (var k = 0; k < Lp; k++) {
+        var px1 = nav_ray_send[k][0];
+        var py1 = nav_ray_send[k][1];
+
+        // çizgi (yalnızca bir önceki başlangıçtan)
+        if (k == 0 && !(px0 == px1 && py0 == py1)) {
+            draw_line(px0, py0, px1, py1);
+        } else if (k > 0) {
+            draw_line(nav_ray_send[k-1][0], nav_ray_send[k-1][1], px1, py1);
+        }
+
+        // nokta
+        draw_circle(px1, py1, 3, false);
+    }
+}

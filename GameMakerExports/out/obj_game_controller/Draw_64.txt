@@ -1,0 +1,208 @@
+/// Object : obj_game_controller | Draw_64
+
+
+
+
+if (!pause_active) exit;
+
+if (global.font_pause != -1) draw_set_font(global.font_pause);
+else if (global.font_menu != -1) draw_set_font(global.font_menu);
+
+var gw = display_get_gui_width();
+var gh = display_get_gui_height();
+
+// Arkaplan: varsa blur, yoksa son kare
+if (surface_exists(pause_blur)) {
+    draw_surface_stretched(pause_blur, 0, 0, gw, gh);
+} else if (surface_exists(pause_src)) {
+    draw_surface_stretched(pause_src, 0, 0, gw, gh);
+}
+
+// Tek karartma
+draw_set_alpha(0.45);
+draw_set_color(c_black);
+draw_rectangle(0, 0, gw, gh, false);
+draw_set_alpha(1);
+
+// Panel
+var pw = 560, ph = 360;
+var px = (gw - pw) * 0.5;
+var py = (gh - ph) * 0.5;
+
+draw_set_color(make_color_rgb(25,30,38));
+draw_rectangle(px, py, px+pw, py+ph, false);
+draw_set_color(c_white);
+
+// Başlık
+if (menu_font != -1) draw_set_font(menu_font);
+draw_text(px+pw*0.5, py+40, lang_get("Pause", "Paused"));
+draw_set_halign(fa_center);
+draw_set_valign(fa_middle);
+draw_set_font(global.font_menu);
+draw_set_alpha(0.85);
+var mm = global.lang_menu;
+var pause_label = (ds_exists(mm, ds_type_map) && ds_map_exists(mm, "Pause"))
+    ? string(mm[? "Pause"]) : "Paused";
+draw_text(px+pw*0.5, py+40, pause_label);
+
+draw_set_alpha(1);
+
+// Butonlar
+var items = [
+    ["Resume",        lang_get("Resume","Resume")],
+    ["Load_Game",     lang_get("Load_Game","Load Game")],
+    ["Options",       lang_get("Options","Options")],
+    ["Exit_to_Menu",  lang_get("Exit_to_Menu","Exit to Main Menu")]
+];
+
+var mx = device_mouse_x_to_gui(0);
+var my = device_mouse_y_to_gui(0);
+
+var bx = px + 60;
+var bw = pw - 120;
+var by0 = py + 90;
+var bh = 56;
+var gap = 14;
+
+var over = -1;
+for (var i = 0; i < array_length(items); i++) {
+    var by1 = by0 + i*(bh+gap);
+    var by2 = by1 + bh;
+
+    var hov = (mx >= bx && mx <= bx+bw && my >= by1 && my <= by2);
+    if (hov) over = i;
+
+    var col = hov ? make_color_rgb(70,110,150) : make_color_rgb(44,49,58);
+    draw_set_alpha(hov ? 0.9 : 0.8);
+    draw_set_color(col);
+    draw_rectangle(bx, by1, bx+bw, by2, false);
+    draw_set_alpha(1);
+
+    draw_set_color(c_white);
+    draw_text(bx + bw*0.5, (by1+by2)*0.5, items[i][1]);
+}
+
+// Click
+if (mouse_check_button_pressed(mb_left) && over != -1) {
+    var key = items[over][0];
+    switch (key) {
+        case "Resume":
+            pause_off();
+            break;
+        case "Load_Game":
+            pause_off();
+            room_goto(Load_Game);
+            break;
+        case "Options":
+            pause_off();
+            room_goto(Options);
+            break;
+        case "Exit_to_Menu":
+            pause_off();
+            room_goto(Main_Menu);
+            break;
+    }
+}
+"
+/// obj_game_controller.Draw GUI End
+if (!pause_active) exit;
+
+if (global.font_pause != -1) draw_set_font(global.font_pause);
+else if (global.font_menu != -1) draw_set_font(global.font_menu);
+
+
+var gw = display_get_gui_width();
+var gh = display_get_gui_height();
+
+// Arkaplan: varsa blur, yoksa son kare
+if (surface_exists(pause_blur)) {
+    draw_surface_stretched(pause_blur, 0, 0, gw, gh);
+} else if (surface_exists(pause_src)) {
+    draw_surface_stretched(pause_src, 0, 0, gw, gh);
+}
+
+// Tek karartma
+draw_set_alpha(0.45);
+draw_set_color(c_black);
+draw_rectangle(0, 0, gw, gh, false);
+draw_set_alpha(1);
+
+// Panel
+var pw = 560, ph = 360;
+var px = (gw - pw) * 0.5;
+var py = (gh - ph) * 0.5;
+
+draw_set_color(make_color_rgb(25,30,38));
+draw_rectangle(px, py, px+pw, py+ph, false);
+draw_set_color(c_white);
+
+// Başlık
+if (menu_font != -1) draw_set_font(menu_font);
+draw_text(px+pw*0.5, py+40, lang_get("Pause", "Paused"));
+draw_set_halign(fa_center);
+draw_set_valign(fa_middle);
+draw_set_font(global.font_menu);
+draw_set_alpha(0.85);
+var mm = global.lang_menu;
+var pause_label = (ds_exists(mm, ds_type_map) && ds_map_exists(mm, "Pause"))
+    ? string(mm[? "Pause"]) : "Paused";
+draw_text(px+pw*0.5, py+40, pause_label);
+
+draw_set_alpha(1);
+
+// Butonlar
+var items = [
+    ["Resume",        lang_get("Resume","Resume")],
+    ["Load_Game",     lang_get("Load_Game","Load Game")],
+    ["Options",       lang_get("Options","Options")],
+    ["Exit_to_Menu",  lang_get("Exit_to_Menu","Exit to Main Menu")]
+];
+
+var mx = device_mouse_x_to_gui(0);
+var my = device_mouse_y_to_gui(0);
+
+var bx = px + 60;
+var bw = pw - 120;
+var by0 = py + 90;
+var bh = 56;
+var gap = 14;
+
+var over = -1;
+for (var i = 0; i < array_length(items); i++) {
+    var by1 = by0 + i*(bh+gap);
+    var by2 = by1 + bh;
+
+    var hov = (mx >= bx && mx <= bx+bw && my >= by1 && my <= by2);
+    if (hov) over = i;
+
+    var col = hov ? make_color_rgb(70,110,150) : make_color_rgb(44,49,58);
+    draw_set_alpha(hov ? 0.9 : 0.8);
+    draw_set_color(col);
+    draw_rectangle(bx, by1, bx+bw, by2, false);
+    draw_set_alpha(1);
+
+    draw_set_color(c_white);
+    draw_text(bx + bw*0.5, (by1+by2)*0.5, items[i][1]);
+}
+
+// Click
+if (mouse_check_button_pressed(mb_left) && over != -1) {
+    var key = items[over][0];
+    switch (key) {
+        case "Resume":
+            pause_off();
+            break;
+        case "Load_Game":
+            pause_off();
+            room_goto(Load_Game);
+            break;
+        case "Options":
+            pause_off();
+            room_goto(Options);
+            break;
+        case "Exit_to_Menu":
+            pause_off();
+            room_goto(Main_Menu);
+            break;
+    }
+}

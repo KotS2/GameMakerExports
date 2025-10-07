@@ -1,0 +1,10 @@
+/// Object : obj_MainMenu | Mouse_60
+
+
+
+
+if (state == "load")  load_scroll = max(0, load_scroll - scroll_step);
+if (state == "options") opt_scroll = max(0, opt_scroll - scroll_step);"
+//obj_MainMenu Mheel UP
+if (state == "load")  load_scroll = max(0, load_scroll - scroll_step);
+if (state == "options") opt_scroll = max(0, opt_scroll - scroll_step);

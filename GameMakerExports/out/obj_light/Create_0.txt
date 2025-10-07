@@ -1,0 +1,10 @@
+/// Object : obj_light | Create_0
+
+
+
+
+range = 1;       // normalize edildi, gölge sistemini etkilemez
+intensity = 1;   // normalize edildi, gölge sistemini etkilemez"
+/// obj_light - Create
+range = 1;       // normalize edildi, gölge sistemini etkilemez
+intensity = 1;   // normalize edildi, gölge sistemini etkilemez

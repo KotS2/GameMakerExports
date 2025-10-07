@@ -1,0 +1,5 @@
+/// Script : scr_flag_check
+//scr_flag_check
+var f = argument0;
+if (!variable_global_exists("flags")) return false;
+return ds_map_exists(global.flags, f) && global.flags[? f] == true;

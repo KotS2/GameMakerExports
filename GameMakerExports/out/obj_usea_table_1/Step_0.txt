@@ -1,0 +1,7 @@
+/// Object : obj_usea_table_1 | Step_0
+
+
+
+
+"
+depth = -y; // Masa depth’i sürekli güncellenir

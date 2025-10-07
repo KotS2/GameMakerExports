@@ -1,0 +1,653 @@
+/// Object : obj_Boot | Create_0
+
+
+
+
+// Boot.Create (uygun bir yerde)
+global.CURSOR_DEPTH_TOP    = 10000000;
+global.CURSOR_DEPTH_BOTTOM = -10000000;
+
+global.scr_cursor_set_depth = function(d) {
+    if (instance_exists(obj_UICursor)) with (obj_UICursor) depth = d;
+};
+
+global.scr_room_goto = function(_room) {
+    global.scr_cursor_set_depth(global.CURSOR_DEPTH_TOP); // <<< tam şimdi, geçişten hemen önce
+    room_goto(_room);
+};
+
+global.CURSOR_CUSTOM = 0;
+global.CURSOR_OS     = 1;
+global.CURSOR_OFF    = 2;
+
+if (!variable_global_exists("cursor_mode"))
+    global.cursor_mode = global.CURSOR_CUSTOM; // <-- Varsayılan: görünsün
+
+// ===================== 0) Kendi cursor (OS gizle) =====================
+//window_set_cursor(cr_none);
+global.cursor_sprite = spr_cursor; // varsa kendi sprite'ınız
+global.cursor_hot_x  = 0;
+global.cursor_hot_y  = 0;
+global.cursor_show_os_when_unfocused = true; // odak kaybında OS imleci görünsün
+
+// ===================== 1) Tek sefer guard =====================
+if (!variable_global_exists("game_initialized")) global.game_initialized = false;
+if (global.game_initialized) { room_goto(Main_Menu); exit; }
+global.game_initialized = true;
+
+// ===================== 2) SABİT GUI tuvali =====================
+global.GUI_BASE_W = 1280;
+global.GUI_BASE_H = 720;
+
+// ===================== 3) DİNAMİK ÇÖZÜNÜRLÜK LİSTESİ =====================
+var _has_res = function(list, r) {
+    for (var i = 0; i < array_length(list); i++) {
+        var a = list[i];
+        if (is_array(a) && a[0] == r[0] && a[1] == r[1]) return true;
+    }
+    return false;
+};
+
+// Native masaüstü çözünürlüğü
+var native_w = display_get_width();
+var native_h = display_get_height();
+var native   = [native_w, native_h];
+
+// Yaygın presetler
+var L16x9  = [[2560,1440],[1920,1080],[1600,900],[1536,864],[1366,768],[1280,720]];
+var L16x10 = [[1920,1200],[1680,1050],[1440,900],[1280,800]];
+var L5x4   = [[1280,1024],[720,576]];
+var L4x3   = [[1600,1200],[1280,960],[1024,768]];
+
+// Native en-boy oranına göre kova
+var ar = native_w / native_h;
+var bucket = L16x9;
+if (abs(ar - (16/10)) < 0.04) bucket = L16x10;
+else if (abs(ar - (5/4)) < 0.04) bucket = L5x4;
+else if (abs(ar - (4/3)) < 0.04) bucket = L4x3;
+
+// Çıkış listesi: önce native
+var out = [native];
+// Kovadan sığan ve tekrarsız modlar
+for (var i=0;i<array_length(bucket);i++) {
+    var r = bucket[i];
+    if (!_has_res(out, r) && r[0] <= native_w && r[1] <= native_h) array_push(out, r);
+}
+// Evrensel fallback: 1920x1080, 1280x720 (sığıyorsa)
+var musts = [[1920,1080],[1280,720]];
+for (var j=0;j<array_length(musts);j++) {
+    var r2 = musts[j];
+    if (!_has_res(out, r2) && r2[0] <= native_w && r2[1] <= native_h) array_push(out, r2);
+}
+global.res_list = out;
+
+// ===================== 4) Varsayılan OPTIONS =====================
+if (!variable_global_exists("opt_res_index"))  {
+    var _find_idx = function(list, r) {
+        for (var k = 0; k < array_length(list); k++) {
+            var a = list[k];
+            if (is_array(a) && a[0] == r[0] && a[1] == r[1]) return k;
+        }
+        return -1;
+    };
+    var idx_720  = _find_idx(global.res_list, [1280,720]);
+    var idx_1080 = _find_idx(global.res_list, [1920,1080]);
+    global.opt_res_index = (idx_720 >= 0) ? idx_720 : ((idx_1080 >= 0) ? idx_1080 : 0);
+}
+if (!variable_global_exists("opt_fullscreen")) global.opt_fullscreen = false;
+if (!variable_global_exists("opt_music"))      global.opt_music      = 1.0;
+if (!variable_global_exists("opt_voi"))        global.opt_voi        = 1.0;
+if (!variable_global_exists("opt_sfx"))        global.opt_sfx        = 1.0;
+if (!variable_global_exists("opt_amb"))        global.opt_amb        = 1.0;
+if (!variable_global_exists("opt_sub_lang"))   global.opt_sub_lang   = "en";
+if (!variable_global_exists("opt_voi_lang"))   global.opt_voi_lang   = "en";
+
+// ===================== 4.b) Save slot ADDET ve DİZİYİ BİR KEZ AYARLA =====================
+var desired_slots = 20;
+if (!variable_global_exists("save_slots")) {
+    global.save_slots = desired_slots;
+} else {
+    global.save_slots = max(global.save_slots, desired_slots);
+}
+
+if (!variable_global_exists("save_data") || is_undefined(global.save_data)) {
+    global.save_data = array_create(global.save_slots, undefined);
+} else {
+    var old_arr = global.save_data;
+    var old_len = array_length(old_arr);
+    if (old_len != global.save_slots) {
+        var new_arr = array_create(global.save_slots, undefined);
+        var copy_len = min(old_len, global.save_slots);
+        for (var ci = 0; ci < copy_len; ci++) new_arr[ci] = old_arr[ci];
+        global.save_data = new_arr;
+    }
+}
+
+// ===================== 5) SETTINGS.INI'den OKU (JSON YOK) =====================
+var settings_ini = "settings.ini";
+if (file_exists(settings_ini)) {
+    ini_open(settings_ini);
+    // Video
+    if (ini_key_exists("Video","res_index"))  global.opt_res_index  = clamp(real(ini_read_string("Video","res_index", string(global.opt_res_index))), 0, array_length(global.res_list)-1);
+    if (ini_key_exists("Video","fullscreen")) global.opt_fullscreen = (ini_read_string("Video","fullscreen","0") == "1");
+    // Audio
+    if (ini_key_exists("Audio","music")) global.opt_music = clamp(real(ini_read_string("Audio","music", string(global.opt_music))), 0, 1);
+    if (ini_key_exists("Audio","voice")) global.opt_voi   = clamp(real(ini_read_string("Audio","voice",  string(global.opt_voi))),   0, 1);
+    if (ini_key_exists("Audio","sfx"))   global.opt_sfx   = clamp(real(ini_read_string("Audio","sfx",    string(global.opt_sfx))),   0, 1);
+    if (ini_key_exists("Audio","amb"))   global.opt_amb   = clamp(real(ini_read_string("Audio","amb",    string(global.opt_amb))),   0, 1);
+    // Lang
+    if (ini_key_exists("Lang","sub"))     global.opt_sub_lang = ini_read_string("Lang","sub",     global.opt_sub_lang);
+    if (ini_key_exists("Lang","voice"))   global.opt_voi_lang = ini_read_string("Lang","voice",   global.opt_voi_lang);
+    ini_close();
+}
+
+// ===================== 6) Yardımcı FONKSİYONLAR =====================
+
+// Basit array_index_of
+global.arr_index_of = function(arr, val) {
+    var n = array_length(arr);
+    for (var i = 0; i < n; i++) if (arr[i] == val) return i;
+    return -1;
+};
+
+// Çözünürlüğü uygula (sabit GUI + app surface)
+global.scr_apply_resolution = function () {
+    var idx = clamp(global.opt_res_index, 0, array_length(global.res_list)-1);
+    var r   = global.res_list[idx];
+    var rw  = r[0], rh = r[1];
+
+    window_set_fullscreen(false);
+    window_set_size(rw, rh);
+
+    if (surface_exists(application_surface)) {
+        surface_resize(application_surface, rw, rh);
+    }
+
+    display_set_gui_maximise(false);
+    display_set_gui_size(global.GUI_BASE_W, global.GUI_BASE_H);
+
+    if (global.opt_fullscreen) window_set_fullscreen(true);
+
+    if (!global.opt_fullscreen) {
+        var sw = display_get_width(), sh = display_get_height();
+        window_set_position(max(0,(sw-rw) div 2), max(0,(sh-rh) div 2));
+    }
+
+    with (obj_MainMenu) if (is_undefined(recalc_layout) == false) recalc_layout();
+};
+
+// Options KAYDET → settings.ini
+global.scr_save_options = function () {
+    var f = "settings.ini";
+    ini_open(f);
+    // Video
+    ini_write_string("Video","res_index",  string(global.opt_res_index));
+    ini_write_string("Video","fullscreen", global.opt_fullscreen ? "1" : "0");
+    // Audio
+    ini_write_string("Audio","music", string(global.opt_music));
+    ini_write_string("Audio","voice", string(global.opt_voi));
+    ini_write_string("Audio","sfx",   string(global.opt_sfx));
+    ini_write_string("Audio","amb",   string(global.opt_amb));
+    // Lang
+    ini_write_string("Lang","sub",   global.opt_sub_lang);
+    ini_write_string("Lang","voice", global.opt_voi_lang);
+    ini_close();
+};
+
+// Dil: Included Files/lang_list.ini → ["en","tr",...]
+global.scr_read_lang_list = function () {
+    var arr = [];
+    var fname = "lang_list.ini";
+    if (!file_exists(fname)) return ["en"];
+    var fh = file_text_open_read(fname);
+    while (!file_text_eof(fh)) {
+        var line = string_trim(file_text_read_string(fh)); file_text_readln(fh);
+        if (line == "" || string_copy(line,1,1) == "#") continue;
+        array_push(arr, line);
+    }
+    file_text_close(fh);
+    if (array_length(arr) == 0) arr = ["en"];
+    return arr;
+};
+
+// "en","menu" → "en/menu_en.ini"
+global.scr_lang_path = function (code, base) {
+    return code + "/" + base + "_" + code + ".ini";
+};
+
+// DS map guard/clear
+global.scr_ensure_new_map = function (m) {
+    if (is_undefined(m)) return ds_map_create();
+    if (ds_exists(m, ds_type_map)) { ds_map_clear(m); return m; }
+    return ds_map_create();
+};
+
+// INI -> map (custom parser; [Section] + text=...)
+global.scr_load_ini_to_map = function (path, map) {
+    if (!file_exists(path)) return false;
+    var fh = file_text_open_read(path);
+    var section = "";
+    while (!file_text_eof(fh)) {
+        var line = string_trim(file_text_read_string(fh)); file_text_readln(fh);
+        if (line == "") continue;
+        var first = string_copy(line, 1, 1);
+        if (first == "#" || first == ";") continue;
+        if (string_copy(line,1,1) == "[" && string_copy(line, string_length(line), 1) == "]") {
+            section = string_trim(string_copy(line, 2, string_length(line) - 2));
+            continue;
+        }
+        var eq = string_pos("=", line);
+        if (eq > 0) {
+            var key = string_trim(string_copy(line, 1, eq - 1));
+            var val = string_trim(string_copy(line, eq + 1, string_length(line) - eq));
+            if (key == "text") {
+                if (section == "") section = "ROOT";
+                map[? section] = val;
+            }
+        }
+    }
+    file_text_close(fh);
+    return true;
+};
+
+// Tüm dil dosyalarını yükle
+global.scr_reload_lang_files = function () {
+    var _menu   = variable_global_exists("lang_menu")   ? global.lang_menu   : undefined;
+    var _dialog = variable_global_exists("lang_dialog") ? global.lang_dialog : undefined;
+    var _fail   = variable_global_exists("lang_fail")   ? global.lang_fail   : undefined;
+    var _itm    = variable_global_exists("lang_itm")    ? global.lang_itm    : undefined;
+    var _voi    = variable_global_exists("lang_voi")    ? global.lang_voi    : undefined;
+
+    global.lang_menu   = global.scr_ensure_new_map(_menu);
+    global.lang_dialog = global.scr_ensure_new_map(_dialog);
+    global.lang_fail   = global.scr_ensure_new_map(_fail);
+    global.lang_itm    = global.scr_ensure_new_map(_itm);
+    global.lang_voi    = global.scr_ensure_new_map(_voi);
+
+    var code_sub = global.opt_sub_lang;
+    var code_voi = global.opt_voi_lang;
+
+    var okm = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"menu"),     global.lang_menu);
+    var okd = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"dialog"),   global.lang_dialog);
+    var okf = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"fail_msg"), global.lang_fail);
+    var oki = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"itm"),      global.lang_itm);
+    var okv = global.scr_load_ini_to_map(global.scr_lang_path(code_voi,"voi"),      global.lang_voi);
+
+    if (!okm) global.scr_load_ini_to_map(global.scr_lang_path("en","menu"),     global.lang_menu);
+    if (!okd) global.scr_load_ini_to_map(global.scr_lang_path("en","dialog"),   global.lang_dialog);
+    if (!okf) global.scr_load_ini_to_map(global.scr_lang_path("en","fail_msg"), global.lang_fail);
+    if (!oki) global.scr_load_ini_to_map(global.scr_lang_path("en","itm"),      global.lang_itm);
+    if (!okv) global.scr_load_ini_to_map(global.scr_lang_path("en","voi"),      global.lang_voi);
+};
+
+// Dil ileri/geri (Options için)
+global.scr_next_lang = function (code) {
+    var L = global.lang_codes;
+    var i = global.arr_index_of(L, code);
+    if (i < 0) return L[0];
+    return L[(i + 1) mod array_length(L)];
+};
+global.scr_prev_lang = function (code) {
+    var L = global.lang_codes;
+    var i = global.arr_index_of(L, code);
+    if (i < 0) return L[0];
+    return L[(i - 1 + array_length(L)) mod array_length(L)];
+};
+
+// ===================== 7) Çözünürlüğü uygula =====================
+global.scr_apply_resolution();
+
+// ===================== 8) Font guard =====================
+//if (!variable_global_exists("font_menu")) {
+//    if (asset_get_index("fnt_menu") != -1)      global.font_menu = fnt_menu;
+//    else if (asset_get_index("fnt_Menu") != -1) global.font_menu = fnt_Menu;
+//    else                                         global.font_menu = -1;
+//}
+//
+//if (!variable_global_exists("font_pause")) {
+//    if (asset_get_index("fnt_mini_menu") != -1) global.font_pause = fnt_mini_menu;
+//    else                                         global.font_pause = global.font_menu; // fallback
+//}
+global.font_menu  = fnt_menu;
+global.font_pause = fnt_mini_menu;
+
+// ===================== 9) Dil listesi & INI yükleme =====================
+global.lang_codes = global.scr_read_lang_list();
+if (global.arr_index_of(global.lang_codes, global.opt_sub_lang) < 0) global.opt_sub_lang = global.lang_codes[0];
+if (global.arr_index_of(global.lang_codes, global.opt_voi_lang) < 0) global.opt_voi_lang = global.lang_codes[0];
+global.scr_reload_lang_files();
+
+// ===================== 11) Main Menu'ya geç =====================
+room_goto(Main_Menu);
+if (!instance_exists(obj_UICursor)) {
+    var lay = layer_get_name(layer_get_id(0));
+    var inst = instance_create_layer(0, 0, lay, obj_UICursor);
+    inst.persistent = true;
+}
+
+global.room_is_gameplay = false;
+"
+/// obj_Boot.Create — SABİT GUI + DİNAMİK ÇÖZÜNÜRLÜK + INI SETTINGS + CURSOR
+// Boot.Create (uygun bir yerde)
+global.CURSOR_DEPTH_TOP    = 10000000;
+global.CURSOR_DEPTH_BOTTOM = -10000000;
+
+global.scr_cursor_set_depth = function(d) {
+    if (instance_exists(obj_UICursor)) with (obj_UICursor) depth = d;
+};
+
+global.scr_room_goto = function(_room) {
+    global.scr_cursor_set_depth(global.CURSOR_DEPTH_TOP); // <<< tam şimdi, geçişten hemen önce
+    room_goto(_room);
+};
+
+global.CURSOR_CUSTOM = 0;
+global.CURSOR_OS     = 1;
+global.CURSOR_OFF    = 2;
+
+if (!variable_global_exists("cursor_mode"))
+    global.cursor_mode = global.CURSOR_CUSTOM; // <-- Varsayılan: görünsün
+
+// ===================== 0) Kendi cursor (OS gizle) =====================
+//window_set_cursor(cr_none);
+global.cursor_sprite = spr_cursor; // varsa kendi sprite'ınız
+global.cursor_hot_x  = 0;
+global.cursor_hot_y  = 0;
+global.cursor_show_os_when_unfocused = true; // odak kaybında OS imleci görünsün
+
+// ===================== 1) Tek sefer guard =====================
+if (!variable_global_exists("game_initialized")) global.game_initialized = false;
+if (global.game_initialized) { room_goto(Main_Menu); exit; }
+global.game_initialized = true;
+
+// ===================== 2) SABİT GUI tuvali =====================
+global.GUI_BASE_W = 1280;
+global.GUI_BASE_H = 720;
+
+// ===================== 3) DİNAMİK ÇÖZÜNÜRLÜK LİSTESİ =====================
+var _has_res = function(list, r) {
+    for (var i = 0; i < array_length(list); i++) {
+        var a = list[i];
+        if (is_array(a) && a[0] == r[0] && a[1] == r[1]) return true;
+    }
+    return false;
+};
+
+// Native masaüstü çözünürlüğü
+var native_w = display_get_width();
+var native_h = display_get_height();
+var native   = [native_w, native_h];
+
+// Yaygın presetler
+var L16x9  = [[2560,1440],[1920,1080],[1600,900],[1536,864],[1366,768],[1280,720]];
+var L16x10 = [[1920,1200],[1680,1050],[1440,900],[1280,800]];
+var L5x4   = [[1280,1024],[720,576]];
+var L4x3   = [[1600,1200],[1280,960],[1024,768]];
+
+// Native en-boy oranına göre kova
+var ar = native_w / native_h;
+var bucket = L16x9;
+if (abs(ar - (16/10)) < 0.04) bucket = L16x10;
+else if (abs(ar - (5/4)) < 0.04) bucket = L5x4;
+else if (abs(ar - (4/3)) < 0.04) bucket = L4x3;
+
+// Çıkış listesi: önce native
+var out = [native];
+// Kovadan sığan ve tekrarsız modlar
+for (var i=0;i<array_length(bucket);i++) {
+    var r = bucket[i];
+    if (!_has_res(out, r) && r[0] <= native_w && r[1] <= native_h) array_push(out, r);
+}
+// Evrensel fallback: 1920x1080, 1280x720 (sığıyorsa)
+var musts = [[1920,1080],[1280,720]];
+for (var j=0;j<array_length(musts);j++) {
+    var r2 = musts[j];
+    if (!_has_res(out, r2) && r2[0] <= native_w && r2[1] <= native_h) array_push(out, r2);
+}
+global.res_list = out;
+
+// ===================== 4) Varsayılan OPTIONS =====================
+if (!variable_global_exists("opt_res_index"))  {
+    var _find_idx = function(list, r) {
+        for (var k = 0; k < array_length(list); k++) {
+            var a = list[k];
+            if (is_array(a) && a[0] == r[0] && a[1] == r[1]) return k;
+        }
+        return -1;
+    };
+    var idx_720  = _find_idx(global.res_list, [1280,720]);
+    var idx_1080 = _find_idx(global.res_list, [1920,1080]);
+    global.opt_res_index = (idx_720 >= 0) ? idx_720 : ((idx_1080 >= 0) ? idx_1080 : 0);
+}
+if (!variable_global_exists("opt_fullscreen")) global.opt_fullscreen = false;
+if (!variable_global_exists("opt_music"))      global.opt_music      = 1.0;
+if (!variable_global_exists("opt_voi"))        global.opt_voi        = 1.0;
+if (!variable_global_exists("opt_sfx"))        global.opt_sfx        = 1.0;
+if (!variable_global_exists("opt_amb"))        global.opt_amb        = 1.0;
+if (!variable_global_exists("opt_sub_lang"))   global.opt_sub_lang   = "en";
+if (!variable_global_exists("opt_voi_lang"))   global.opt_voi_lang   = "en";
+
+// ===================== 4.b) Save slot ADDET ve DİZİYİ BİR KEZ AYARLA =====================
+var desired_slots = 20;
+if (!variable_global_exists("save_slots")) {
+    global.save_slots = desired_slots;
+} else {
+    global.save_slots = max(global.save_slots, desired_slots);
+}
+
+if (!variable_global_exists("save_data") || is_undefined(global.save_data)) {
+    global.save_data = array_create(global.save_slots, undefined);
+} else {
+    var old_arr = global.save_data;
+    var old_len = array_length(old_arr);
+    if (old_len != global.save_slots) {
+        var new_arr = array_create(global.save_slots, undefined);
+        var copy_len = min(old_len, global.save_slots);
+        for (var ci = 0; ci < copy_len; ci++) new_arr[ci] = old_arr[ci];
+        global.save_data = new_arr;
+    }
+}
+
+// ===================== 5) SETTINGS.INI'den OKU (JSON YOK) =====================
+var settings_ini = "settings.ini";
+if (file_exists(settings_ini)) {
+    ini_open(settings_ini);
+    // Video
+    if (ini_key_exists("Video","res_index"))  global.opt_res_index  = clamp(real(ini_read_string("Video","res_index", string(global.opt_res_index))), 0, array_length(global.res_list)-1);
+    if (ini_key_exists("Video","fullscreen")) global.opt_fullscreen = (ini_read_string("Video","fullscreen","0") == "1");
+    // Audio
+    if (ini_key_exists("Audio","music")) global.opt_music = clamp(real(ini_read_string("Audio","music", string(global.opt_music))), 0, 1);
+    if (ini_key_exists("Audio","voice")) global.opt_voi   = clamp(real(ini_read_string("Audio","voice",  string(global.opt_voi))),   0, 1);
+    if (ini_key_exists("Audio","sfx"))   global.opt_sfx   = clamp(real(ini_read_string("Audio","sfx",    string(global.opt_sfx))),   0, 1);
+    if (ini_key_exists("Audio","amb"))   global.opt_amb   = clamp(real(ini_read_string("Audio","amb",    string(global.opt_amb))),   0, 1);
+    // Lang
+    if (ini_key_exists("Lang","sub"))     global.opt_sub_lang = ini_read_string("Lang","sub",     global.opt_sub_lang);
+    if (ini_key_exists("Lang","voice"))   global.opt_voi_lang = ini_read_string("Lang","voice",   global.opt_voi_lang);
+    ini_close();
+}
+
+// ===================== 6) Yardımcı FONKSİYONLAR =====================
+
+// Basit array_index_of
+global.arr_index_of = function(arr, val) {
+    var n = array_length(arr);
+    for (var i = 0; i < n; i++) if (arr[i] == val) return i;
+    return -1;
+};
+
+// Çözünürlüğü uygula (sabit GUI + app surface)
+global.scr_apply_resolution = function () {
+    var idx = clamp(global.opt_res_index, 0, array_length(global.res_list)-1);
+    var r   = global.res_list[idx];
+    var rw  = r[0], rh = r[1];
+
+    window_set_fullscreen(false);
+    window_set_size(rw, rh);
+
+    if (surface_exists(application_surface)) {
+        surface_resize(application_surface, rw, rh);
+    }
+
+    display_set_gui_maximise(false);
+    display_set_gui_size(global.GUI_BASE_W, global.GUI_BASE_H);
+
+    if (global.opt_fullscreen) window_set_fullscreen(true);
+
+    if (!global.opt_fullscreen) {
+        var sw = display_get_width(), sh = display_get_height();
+        window_set_position(max(0,(sw-rw) div 2), max(0,(sh-rh) div 2));
+    }
+
+    with (obj_MainMenu) if (is_undefined(recalc_layout) == false) recalc_layout();
+};
+
+// Options KAYDET → settings.ini
+global.scr_save_options = function () {
+    var f = "settings.ini";
+    ini_open(f);
+    // Video
+    ini_write_string("Video","res_index",  string(global.opt_res_index));
+    ini_write_string("Video","fullscreen", global.opt_fullscreen ? "1" : "0");
+    // Audio
+    ini_write_string("Audio","music", string(global.opt_music));
+    ini_write_string("Audio","voice", string(global.opt_voi));
+    ini_write_string("Audio","sfx",   string(global.opt_sfx));
+    ini_write_string("Audio","amb",   string(global.opt_amb));
+    // Lang
+    ini_write_string("Lang","sub",   global.opt_sub_lang);
+    ini_write_string("Lang","voice", global.opt_voi_lang);
+    ini_close();
+};
+
+// Dil: Included Files/lang_list.ini → ["en","tr",...]
+global.scr_read_lang_list = function () {
+    var arr = [];
+    var fname = "lang_list.ini";
+    if (!file_exists(fname)) return ["en"];
+    var fh = file_text_open_read(fname);
+    while (!file_text_eof(fh)) {
+        var line = string_trim(file_text_read_string(fh)); file_text_readln(fh);
+        if (line == "" || string_copy(line,1,1) == "#") continue;
+        array_push(arr, line);
+    }
+    file_text_close(fh);
+    if (array_length(arr) == 0) arr = ["en"];
+    return arr;
+};
+
+// "en","menu" → "en/menu_en.ini"
+global.scr_lang_path = function (code, base) {
+    return code + "/" + base + "_" + code + ".ini";
+};
+
+// DS map guard/clear
+global.scr_ensure_new_map = function (m) {
+    if (is_undefined(m)) return ds_map_create();
+    if (ds_exists(m, ds_type_map)) { ds_map_clear(m); return m; }
+    return ds_map_create();
+};
+
+// INI -> map (custom parser; [Section] + text=...)
+global.scr_load_ini_to_map = function (path, map) {
+    if (!file_exists(path)) return false;
+    var fh = file_text_open_read(path);
+    var section = "";
+    while (!file_text_eof(fh)) {
+        var line = string_trim(file_text_read_string(fh)); file_text_readln(fh);
+        if (line == "") continue;
+        var first = string_copy(line, 1, 1);
+        if (first == "#" || first == ";") continue;
+        if (string_copy(line,1,1) == "[" && string_copy(line, string_length(line), 1) == "]") {
+            section = string_trim(string_copy(line, 2, string_length(line) - 2));
+            continue;
+        }
+        var eq = string_pos("=", line);
+        if (eq > 0) {
+            var key = string_trim(string_copy(line, 1, eq - 1));
+            var val = string_trim(string_copy(line, eq + 1, string_length(line) - eq));
+            if (key == "text") {
+                if (section == "") section = "ROOT";
+                map[? section] = val;
+            }
+        }
+    }
+    file_text_close(fh);
+    return true;
+};
+
+// Tüm dil dosyalarını yükle
+global.scr_reload_lang_files = function () {
+    var _menu   = variable_global_exists("lang_menu")   ? global.lang_menu   : undefined;
+    var _dialog = variable_global_exists("lang_dialog") ? global.lang_dialog : undefined;
+    var _fail   = variable_global_exists("lang_fail")   ? global.lang_fail   : undefined;
+    var _itm    = variable_global_exists("lang_itm")    ? global.lang_itm    : undefined;
+    var _voi    = variable_global_exists("lang_voi")    ? global.lang_voi    : undefined;
+
+    global.lang_menu   = global.scr_ensure_new_map(_menu);
+    global.lang_dialog = global.scr_ensure_new_map(_dialog);
+    global.lang_fail   = global.scr_ensure_new_map(_fail);
+    global.lang_itm    = global.scr_ensure_new_map(_itm);
+    global.lang_voi    = global.scr_ensure_new_map(_voi);
+
+    var code_sub = global.opt_sub_lang;
+    var code_voi = global.opt_voi_lang;
+
+    var okm = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"menu"),     global.lang_menu);
+    var okd = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"dialog"),   global.lang_dialog);
+    var okf = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"fail_msg"), global.lang_fail);
+    var oki = global.scr_load_ini_to_map(global.scr_lang_path(code_sub,"itm"),      global.lang_itm);
+    var okv = global.scr_load_ini_to_map(global.scr_lang_path(code_voi,"voi"),      global.lang_voi);
+
+    if (!okm) global.scr_load_ini_to_map(global.scr_lang_path("en","menu"),     global.lang_menu);
+    if (!okd) global.scr_load_ini_to_map(global.scr_lang_path("en","dialog"),   global.lang_dialog);
+    if (!okf) global.scr_load_ini_to_map(global.scr_lang_path("en","fail_msg"), global.lang_fail);
+    if (!oki) global.scr_load_ini_to_map(global.scr_lang_path("en","itm"),      global.lang_itm);
+    if (!okv) global.scr_load_ini_to_map(global.scr_lang_path("en","voi"),      global.lang_voi);
+};
+
+// Dil ileri/geri (Options için)
+global.scr_next_lang = function (code) {
+    var L = global.lang_codes;
+    var i = global.arr_index_of(L, code);
+    if (i < 0) return L[0];
+    return L[(i + 1) mod array_length(L)];
+};
+global.scr_prev_lang = function (code) {
+    var L = global.lang_codes;
+    var i = global.arr_index_of(L, code);
+    if (i < 0) return L[0];
+    return L[(i - 1 + array_length(L)) mod array_length(L)];
+};
+
+// ===================== 7) Çözünürlüğü uygula =====================
+global.scr_apply_resolution();
+
+// ===================== 8) Font guard =====================
+//if (!variable_global_exists("font_menu")) {
+//    if (asset_get_index("fnt_menu") != -1)      global.font_menu = fnt_menu;
+//    else if (asset_get_index("fnt_Menu") != -1) global.font_menu = fnt_Menu;
+//    else                                         global.font_menu = -1;
+//}
+//
+//if (!variable_global_exists("font_pause")) {
+//    if (asset_get_index("fnt_mini_menu") != -1) global.font_pause = fnt_mini_menu;
+//    else                                         global.font_pause = global.font_menu; // fallback
+//}
+global.font_menu  = fnt_menu;
+global.font_pause = fnt_mini_menu;
+
+// ===================== 9) Dil listesi & INI yükleme =====================
+global.lang_codes = global.scr_read_lang_list();
+if (global.arr_index_of(global.lang_codes, global.opt_sub_lang) < 0) global.opt_sub_lang = global.lang_codes[0];
+if (global.arr_index_of(global.lang_codes, global.opt_voi_lang) < 0) global.opt_voi_lang = global.lang_codes[0];
+global.scr_reload_lang_files();
+
+// ===================== 11) Main Menu'ya geç =====================
+room_goto(Main_Menu);
+if (!instance_exists(obj_UICursor)) {
+    var lay = layer_get_name(layer_get_id(0));
+    var inst = instance_create_layer(0, 0, lay, obj_UICursor);
+    inst.persistent = true;
+}
+
+global.room_is_gameplay = false;

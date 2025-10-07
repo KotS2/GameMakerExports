@@ -1,0 +1,233 @@
+/// Object : obj_player | Draw_0
+
+
+
+
+// --- 0) En yakın 2 ışığı bulmak için hazırlık ---
+dists[0]   = 999999;
+dists[1]   = 999999;
+nearest[0] = noone;
+nearest[1] = noone;
+
+// --- 1) En yakın 2 ışığı seç ---
+with (obj_light) {
+    var d = point_distance(other.x, other.y, x, y);
+
+    if (d < other.dists[0]) {
+        other.dists[1] = other.dists[0];
+        other.nearest[1] = other.nearest[0];
+        other.dists[0] = d;
+        other.nearest[0] = id;
+    }
+    else if (id != other.nearest[0] && d < other.dists[1]) {
+        other.dists[1] = d;
+        other.nearest[1] = id;
+    }
+}
+
+// --- 2) Perspektif ölçek hesapla ---
+var t = clamp((y - global.horizon_y) / global.visible_height, 0, 1);
+
+var bottom_target_ratio = 0.12;
+var spr = sprite_index;
+if (!sprite_exists(spr)) spr = spr_on_idle;
+var spr_h = max(1, sprite_get_height(spr));
+var target_px_h = bottom_target_ratio * global.visible_height;
+var max_scale   = (target_px_h / spr_h) * (variable_global_exists("char_height") ? global.char_height : 1.0);
+var min_scale   = max_scale * 0.25;
+var scale       = lerp(min_scale, max_scale, t);
+
+var img = image_index mod max(1, sprite_get_number(spr));
+
+// --- 3) 2 ışık için gölge çiz ---
+for (var i = 0; i < 2; i++) {
+    var L = nearest[i];
+    if (L != noone) { // ışık varsa çiz
+
+        // Işık yönü → gölge yönü
+        var dir_light  = point_direction(x, y, L.x, L.y);
+        var dir_shadow = (dir_light + 90) mod 360;
+
+        // Flip: scale_x cos(angle) ile
+        var shadow_scale_x = cos(degtorad(dir_shadow)) * scale;
+        var shadow_scale_y = 2.5 * scale;
+
+        // Sabit opacity
+        var shadow_alpha = 0.15;
+
+        /*
+        // --- Blur ayarları ---
+        var blur_layers  = 12;  // toplam kaç katman
+        var blur_radius  = 6;   // blur ne kadar uzağa yayılacak
+
+        // --- Blur çizim ---
+        for (var b = 0; b < blur_layers; b++) {
+            var angle = b * (360 / blur_layers);
+            var offset_x = lengthdir_x(blur_radius, angle);
+            var offset_y = lengthdir_y(blur_radius, angle);
+
+            // Ortadaki ana gölge daha opak, diğerleri şeffaf
+            var alpha = (b == 0) ? shadow_alpha : shadow_alpha * 0.15;
+
+            draw_sprite_ext(
+                spr, img,
+                x + offset_x,
+                y + 20 + offset_y,  // zemine bastır
+                shadow_scale_x,
+                shadow_scale_y,
+                dir_shadow,
+                c_black,
+                alpha
+            );
+        }
+        */
+
+        // --- Basit gölge çizimi (blur kapalı) ---
+        draw_sprite_ext(
+            spr, img,
+            x,
+            y + 20,
+            shadow_scale_x,
+            shadow_scale_y,
+            dir_shadow,
+            c_black,
+            shadow_alpha
+        );
+
+        // --- Debug ---
+        draw_set_color(i == 0 ? c_lime : c_aqua);
+        draw_line(L.x, L.y, x, y);
+        draw_text(x + 40, y - 20 - i * 15,
+            "Light " + string(i+1) +
+            " dir=" + string(round(dir_shadow)) + "°" +
+            " cos=" + string_format(shadow_scale_x,1,2));
+    }
+}
+
+// --- 4) Karakter çiz ---
+draw_sprite_ext(spr, img, x, y, scale, scale, image_angle, image_blend, image_alpha);
+
+// --- 5) Debug bilgiler ---
+draw_set_color(c_white);
+draw_text(32, 32,
+    "L1=" + string(nearest[0]) + " d1=" + string(round(dists[0])) +
+    " | L2=" + string(nearest[1]) + " d2=" + string(round(dists[1])));
+draw_text(32, 52,
+    "Scale: " + string(round(scale * 100) / 100) +
+    " | Perspective T: " + string(round(t * 100) / 100));
+"
+/// obj_player - Draw Event
+
+// --- 0) En yakın 2 ışığı bulmak için hazırlık ---
+dists[0]   = 999999;
+dists[1]   = 999999;
+nearest[0] = noone;
+nearest[1] = noone;
+
+// --- 1) En yakın 2 ışığı seç ---
+with (obj_light) {
+    var d = point_distance(other.x, other.y, x, y);
+
+    if (d < other.dists[0]) {
+        other.dists[1] = other.dists[0];
+        other.nearest[1] = other.nearest[0];
+        other.dists[0] = d;
+        other.nearest[0] = id;
+    }
+    else if (id != other.nearest[0] && d < other.dists[1]) {
+        other.dists[1] = d;
+        other.nearest[1] = id;
+    }
+}
+
+// --- 2) Perspektif ölçek hesapla ---
+var t = clamp((y - global.horizon_y) / global.visible_height, 0, 1);
+
+var bottom_target_ratio = 0.12;
+var spr = sprite_index;
+if (!sprite_exists(spr)) spr = spr_on_idle;
+var spr_h = max(1, sprite_get_height(spr));
+var target_px_h = bottom_target_ratio * global.visible_height;
+var max_scale   = (target_px_h / spr_h) * (variable_global_exists("char_height") ? global.char_height : 1.0);
+var min_scale   = max_scale * 0.25;
+var scale       = lerp(min_scale, max_scale, t);
+
+var img = image_index mod max(1, sprite_get_number(spr));
+
+// --- 3) 2 ışık için gölge çiz ---
+for (var i = 0; i < 2; i++) {
+    var L = nearest[i];
+    if (L != noone) { // ışık varsa çiz
+
+        // Işık yönü → gölge yönü
+        var dir_light  = point_direction(x, y, L.x, L.y);
+        var dir_shadow = (dir_light + 90) mod 360;
+
+        // Flip: scale_x cos(angle) ile
+        var shadow_scale_x = cos(degtorad(dir_shadow)) * scale;
+        var shadow_scale_y = 2.5 * scale;
+
+        // Sabit opacity
+        var shadow_alpha = 0.15;
+
+        /*
+        // --- Blur ayarları ---
+        var blur_layers  = 12;  // toplam kaç katman
+        var blur_radius  = 6;   // blur ne kadar uzağa yayılacak
+
+        // --- Blur çizim ---
+        for (var b = 0; b < blur_layers; b++) {
+            var angle = b * (360 / blur_layers);
+            var offset_x = lengthdir_x(blur_radius, angle);
+            var offset_y = lengthdir_y(blur_radius, angle);
+
+            // Ortadaki ana gölge daha opak, diğerleri şeffaf
+            var alpha = (b == 0) ? shadow_alpha : shadow_alpha * 0.15;
+
+            draw_sprite_ext(
+                spr, img,
+                x + offset_x,
+                y + 20 + offset_y,  // zemine bastır
+                shadow_scale_x,
+                shadow_scale_y,
+                dir_shadow,
+                c_black,
+                alpha
+            );
+        }
+        */
+
+        // --- Basit gölge çizimi (blur kapalı) ---
+        draw_sprite_ext(
+            spr, img,
+            x,
+            y + 20,
+            shadow_scale_x,
+            shadow_scale_y,
+            dir_shadow,
+            c_black,
+            shadow_alpha
+        );
+
+        // --- Debug ---
+        draw_set_color(i == 0 ? c_lime : c_aqua);
+        draw_line(L.x, L.y, x, y);
+        draw_text(x + 40, y - 20 - i * 15,
+            "Light " + string(i+1) +
+            " dir=" + string(round(dir_shadow)) + "°" +
+            " cos=" + string_format(shadow_scale_x,1,2));
+    }
+}
+
+// --- 4) Karakter çiz ---
+draw_sprite_ext(spr, img, x, y, scale, scale, image_angle, image_blend, image_alpha);
+
+// --- 5) Debug bilgiler ---
+draw_set_color(c_white);
+draw_text(32, 32,
+    "L1=" + string(nearest[0]) + " d1=" + string(round(dists[0])) +
+    " | L2=" + string(nearest[1]) + " d2=" + string(round(dists[1])));
+draw_text(32, 52,
+    "Scale: " + string(round(scale * 100) / 100) +
+    " | Perspective T: " + string(round(t * 100) / 100));
+/**/

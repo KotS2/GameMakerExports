@@ -1,0 +1,490 @@
+/// Object : obj_nav | Step_0
+
+
+
+
+// --- Player pozisyonunu oku (her zaman lazım) ---
+var p  = instance_find(obj_player, 0);
+var sx, sy;
+if (instance_exists(p)) {
+    sx = p.x;
+    sy = p.y;
+} else {
+    sx = x;
+    sy = y;
+}
+
+// === Interaktif hedef tespiti ===
+var target_inst = noone;
+var list = ds_list_create();
+var cnt  = collision_point_list(mouse_x, mouse_y, all, false, true, list, true);
+
+for (var i = 0; i < cnt; i++) {
+    var inst = list[| i];
+    var nm   = string_lower(object_get_name(inst.object_index));
+
+    if (string_pos("tkna", nm) > 0 || string_pos("tkny", nm) > 0 ||
+        string_pos("usea", nm) > 0 || string_pos("usey", nm) > 0) {
+        target_inst = inst;
+        show_debug_message("[NAV] interaktif bulundu → " + nm);
+        break; // ilk uygun olanı al
+    }
+}
+ds_list_destroy(list);
+
+// === Tıklama ile işlem başlat ===
+if (mouse_check_button_pressed(mb_left)) {
+
+    // 🔴 BURAYA EKLE
+    var sh = display_get_gui_height();
+	var bar_y = sh - global.inv_bar_height;
+    var over_gui = (device_mouse_y_to_gui(0) >= bar_y);
+
+    if (over_gui && global.inv_open) {
+        show_debug_message("[NAV] Click ignored (over GUI)");
+        exit; // pathfinding başlamasın
+    }
+
+    // --- Hedef koordinatını seç ---
+    var tx, ty;
+    if (target_inst != noone) {
+        // Obje için erişilebilir nokta
+        var pt = get_reachable_point_for_interaction(target_inst, sx, sy);
+        tx = pt[0];
+        ty = pt[1];
+    } else {
+        // Normal boş zemin → mouse noktası
+        tx = clamp(mouse_x, 0, room_width  - 1);
+        ty = clamp(mouse_y, 0, room_height - 1);
+    }
+
+    // --- Start güvenliği (path solver için) ---
+    if (collision_point(sx, sy, obj_obstacle, true, true)) {
+        var ok = false, rr = cell;
+        while (!ok && rr <= cell * 3) {
+            for (var a = 0; a < 360; a += 45) {
+                var nx = sx + lengthdir_x(rr, a);
+                var ny = sy + lengthdir_y(rr, a);
+                if (!collision_point(nx, ny, obj_obstacle, true, true)) {
+                    sx = nx; sy = ny; ok = true;
+                    show_debug_message("[NAV] start sanitized → (" + string(sx) + "," + string(sy) + ")");
+                    break;
+                }
+            }
+            rr += cell;
+        }
+    }
+
+    // Grid sınırına kırp
+    var gw = room_width  div cell;
+    var gh = room_height div cell;
+    var maxx = gw * cell - 1;
+    var maxy = gh * cell - 1;
+    sx = clamp(sx, 0, maxx);
+    sy = clamp(sy, 0, maxy);
+
+    // Snap hedefi
+    var cx = floor(tx / cell);
+    var cy = floor(ty / cell);
+    tx = cx * cell + cell * 0.5;
+    ty = cy * cell + cell * 0.5;
+
+    debug_center_x = tx;
+    debug_center_y = ty;
+    dbg_trace_clear();
+
+    // === Grid path
+    nav_rebuild_grid();
+    dbg_trace_add(tx, ty, 0);
+    var found = mp_grid_path(grid, path, sx, sy, tx, ty, allow_diag);
+    if (found && path_get_number(path) < 2) found = false;
+    if (found) debug_hit_index = array_length(debug_trace) - 1;
+
+    // === Fallback (yarım daire, en yakını seç) ===
+    if (!found) {
+        var base_dir = point_direction(tx, ty, sx, sy);
+
+        var best_ok = false;
+        var best_px = 0;
+        var best_py = 0;
+        var best_dist = 999999999;
+        var best_hit_index = -1;
+
+        for (var r = 1; r <= rings_max; r++) {
+            var steps = ring_steps_base + r * ring_steps_growth;
+            var ring_radius = r * cell * ring_rad_factor;
+
+            for (var i = 0; i < steps; i++) {
+                var ang = base_dir - 65 + (i / steps) * 180;
+                var px  = tx + lengthdir_x(ring_radius, ang);
+                var py  = ty + lengthdir_y(ring_radius, ang);
+
+                // Grid sınırına snap
+                px = clamp(px, 0, room_width  - 1);
+                py = clamp(py, 0, room_height - 1);
+                var pcx = floor(px / cell);
+                var pcy = floor(py / cell);
+                px = pcx * cell + cell * 0.5;
+                py = pcy * cell + cell * 0.5;
+
+                dbg_trace_add(px, py, r);
+                var trace_idx = array_length(debug_trace) - 1;
+
+                if (mp_grid_path(grid, path, sx, sy, px, py, allow_diag)) {
+                    if (path_get_number(path) >= 2) {
+                        var dist_to_click = point_distance(px, py, mouse_x, mouse_y);
+                        if (dist_to_click < best_dist) {
+                            best_dist = dist_to_click;
+                            best_px = px;
+                            best_py = py;
+                            best_ok = true;
+                            best_hit_index = trace_idx;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (best_ok) {
+            tx = best_px;
+            ty = best_py;
+            found = mp_grid_path(grid, path, sx, sy, tx, ty, allow_diag);
+            debug_hit_index = best_hit_index;
+        }
+    }
+
+    // === MP path → dizi
+    var n = path_get_number(path);
+    nav_ray_full = [];
+    array_push(nav_ray_full, [sx, sy]);
+    for (var k = 1; k < n; k++) {
+        array_push(nav_ray_full, [ path_get_point_x(path, k), path_get_point_y(path, k) ]);
+    }
+
+    // === LOS simplify + sanitize
+    var simp = ray_simplify_los(nav_ray_full);
+    var safe_ray = [];
+    for (var j = 0; j < array_length(simp); j++) {
+        var cand = nav_sanitize_target(simp[j][0], simp[j][1]);
+        if (!is_undefined(cand)) array_push(safe_ray, cand);
+    }
+    if (array_length(safe_ray) == 0) array_push(safe_ray, [tx, ty]);
+    nav_ray_simplified = safe_ray;
+
+    // === KISA SEGMENT FİLTRESİ ===
+    var min_seg_len = 14; // px
+    var filtered = [];
+    if (array_length(nav_ray_simplified) > 0) {
+        array_push(filtered, nav_ray_simplified[0]);
+        for (var m = 1; m < array_length(nav_ray_simplified); m++) {
+            var p0 = filtered[array_length(filtered)-1];
+            var p1 = nav_ray_simplified[m];
+            if (point_distance(p0[0], p0[1], p1[0], p1[1]) >= min_seg_len) {
+                array_push(filtered, p1);
+            }
+        }
+        var last = nav_ray_simplified[array_length(nav_ray_simplified)-1];
+        if (filtered[array_length(filtered)-1] != last) {
+            array_push(filtered, last);
+        }
+    }
+    nav_ray_simplified = filtered;
+
+    // === Player’a gönder
+    nav_ray_send = [];
+    for (var m = 0; m < array_length(nav_ray_simplified); m++) {
+        array_push(nav_ray_send, nav_ray_simplified[m]);
+    }
+    if (array_length(nav_ray_send) == 0) array_push(nav_ray_send, [tx, ty]);
+
+    if (instance_exists(p)) {
+        // Eğer tıklanan nokta zaten player’ın yakınındaysa → path gönderme
+        if (point_distance(p.x, p.y, tx, ty) < 8) {
+            nav_ray_send = [];
+        }
+
+        p.my_points  = nav_ray_send;
+        p.my_index   = -1;
+        p.has_target = false;
+
+        // Yön string’i yaz
+        var dx = tx - p.x;
+        var dy = ty - p.y;
+        var dir_str;
+        if (abs(dx) > abs(dy)) dir_str = (dx < 0) ? "left" : "right";
+        else                   dir_str = (dy < 0) ? "up"   : "down";
+        p.last_dir = dir_str;
+
+        // === Interaction queue ===
+        if (target_inst != noone) {
+            var need_reach = (array_length(nav_ray_send) > 1);
+            with (p) {
+                queue_interaction(target_inst, global.selected_item_name, need_reach);
+            }
+        } else {
+            with (p) {
+                cancel_interaction();
+            }
+        }
+
+        show_debug_message("[NAV->PLAYER] raw=" + string(n) +
+            " simp=" + string(array_length(simp)) +
+            " safe=" + string(array_length(nav_ray_simplified)) +
+            " send=" + string(array_length(nav_ray_send)));
+    }
+
+    target_x = tx;
+    target_y = ty;
+}
+
+// === DEBUG animasyon ===
+if (dbg_animate) {
+    var L = array_length(debug_trace);
+    if (debug_anim_progress < L) {
+        debug_anim_progress = min(debug_anim_progress + dbg_anim_speed, L);
+    }
+}
+"
+/// obj_nav - Step
+
+// --- Player pozisyonunu oku (her zaman lazım) ---
+var p  = instance_find(obj_player, 0);
+var sx, sy;
+if (instance_exists(p)) {
+    sx = p.x;
+    sy = p.y;
+} else {
+    sx = x;
+    sy = y;
+}
+
+// === Interaktif hedef tespiti ===
+var target_inst = noone;
+var list = ds_list_create();
+var cnt  = collision_point_list(mouse_x, mouse_y, all, false, true, list, true);
+
+for (var i = 0; i < cnt; i++) {
+    var inst = list[| i];
+    var nm   = string_lower(object_get_name(inst.object_index));
+
+    if (string_pos("tkna", nm) > 0 || string_pos("tkny", nm) > 0 ||
+        string_pos("usea", nm) > 0 || string_pos("usey", nm) > 0) {
+        target_inst = inst;
+        show_debug_message("[NAV] interaktif bulundu → " + nm);
+        break; // ilk uygun olanı al
+    }
+}
+ds_list_destroy(list);
+
+// === Tıklama ile işlem başlat ===
+if (mouse_check_button_pressed(mb_left)) {
+
+    // 🔴 BURAYA EKLE
+    var sh = display_get_gui_height();
+	var bar_y = sh - global.inv_bar_height;
+    var over_gui = (device_mouse_y_to_gui(0) >= bar_y);
+
+    if (over_gui && global.inv_open) {
+        show_debug_message("[NAV] Click ignored (over GUI)");
+        exit; // pathfinding başlamasın
+    }
+
+    // --- Hedef koordinatını seç ---
+    var tx, ty;
+    if (target_inst != noone) {
+        // Obje için erişilebilir nokta
+        var pt = get_reachable_point_for_interaction(target_inst, sx, sy);
+        tx = pt[0];
+        ty = pt[1];
+    } else {
+        // Normal boş zemin → mouse noktası
+        tx = clamp(mouse_x, 0, room_width  - 1);
+        ty = clamp(mouse_y, 0, room_height - 1);
+    }
+
+    // --- Start güvenliği (path solver için) ---
+    if (collision_point(sx, sy, obj_obstacle, true, true)) {
+        var ok = false, rr = cell;
+        while (!ok && rr <= cell * 3) {
+            for (var a = 0; a < 360; a += 45) {
+                var nx = sx + lengthdir_x(rr, a);
+                var ny = sy + lengthdir_y(rr, a);
+                if (!collision_point(nx, ny, obj_obstacle, true, true)) {
+                    sx = nx; sy = ny; ok = true;
+                    show_debug_message("[NAV] start sanitized → (" + string(sx) + "," + string(sy) + ")");
+                    break;
+                }
+            }
+            rr += cell;
+        }
+    }
+
+    // Grid sınırına kırp
+    var gw = room_width  div cell;
+    var gh = room_height div cell;
+    var maxx = gw * cell - 1;
+    var maxy = gh * cell - 1;
+    sx = clamp(sx, 0, maxx);
+    sy = clamp(sy, 0, maxy);
+
+    // Snap hedefi
+    var cx = floor(tx / cell);
+    var cy = floor(ty / cell);
+    tx = cx * cell + cell * 0.5;
+    ty = cy * cell + cell * 0.5;
+
+    debug_center_x = tx;
+    debug_center_y = ty;
+    dbg_trace_clear();
+
+    // === Grid path
+    nav_rebuild_grid();
+    dbg_trace_add(tx, ty, 0);
+    var found = mp_grid_path(grid, path, sx, sy, tx, ty, allow_diag);
+    if (found && path_get_number(path) < 2) found = false;
+    if (found) debug_hit_index = array_length(debug_trace) - 1;
+
+    // === Fallback (yarım daire, en yakını seç) ===
+    if (!found) {
+        var base_dir = point_direction(tx, ty, sx, sy);
+
+        var best_ok = false;
+        var best_px = 0;
+        var best_py = 0;
+        var best_dist = 999999999;
+        var best_hit_index = -1;
+
+        for (var r = 1; r <= rings_max; r++) {
+            var steps = ring_steps_base + r * ring_steps_growth;
+            var ring_radius = r * cell * ring_rad_factor;
+
+            for (var i = 0; i < steps; i++) {
+                var ang = base_dir - 65 + (i / steps) * 180;
+                var px  = tx + lengthdir_x(ring_radius, ang);
+                var py  = ty + lengthdir_y(ring_radius, ang);
+
+                // Grid sınırına snap
+                px = clamp(px, 0, room_width  - 1);
+                py = clamp(py, 0, room_height - 1);
+                var pcx = floor(px / cell);
+                var pcy = floor(py / cell);
+                px = pcx * cell + cell * 0.5;
+                py = pcy * cell + cell * 0.5;
+
+                dbg_trace_add(px, py, r);
+                var trace_idx = array_length(debug_trace) - 1;
+
+                if (mp_grid_path(grid, path, sx, sy, px, py, allow_diag)) {
+                    if (path_get_number(path) >= 2) {
+                        var dist_to_click = point_distance(px, py, mouse_x, mouse_y);
+                        if (dist_to_click < best_dist) {
+                            best_dist = dist_to_click;
+                            best_px = px;
+                            best_py = py;
+                            best_ok = true;
+                            best_hit_index = trace_idx;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (best_ok) {
+            tx = best_px;
+            ty = best_py;
+            found = mp_grid_path(grid, path, sx, sy, tx, ty, allow_diag);
+            debug_hit_index = best_hit_index;
+        }
+    }
+
+    // === MP path → dizi
+    var n = path_get_number(path);
+    nav_ray_full = [];
+    array_push(nav_ray_full, [sx, sy]);
+    for (var k = 1; k < n; k++) {
+        array_push(nav_ray_full, [ path_get_point_x(path, k), path_get_point_y(path, k) ]);
+    }
+
+    // === LOS simplify + sanitize
+    var simp = ray_simplify_los(nav_ray_full);
+    var safe_ray = [];
+    for (var j = 0; j < array_length(simp); j++) {
+        var cand = nav_sanitize_target(simp[j][0], simp[j][1]);
+        if (!is_undefined(cand)) array_push(safe_ray, cand);
+    }
+    if (array_length(safe_ray) == 0) array_push(safe_ray, [tx, ty]);
+    nav_ray_simplified = safe_ray;
+
+    // === KISA SEGMENT FİLTRESİ ===
+    var min_seg_len = 14; // px
+    var filtered = [];
+    if (array_length(nav_ray_simplified) > 0) {
+        array_push(filtered, nav_ray_simplified[0]);
+        for (var m = 1; m < array_length(nav_ray_simplified); m++) {
+            var p0 = filtered[array_length(filtered)-1];
+            var p1 = nav_ray_simplified[m];
+            if (point_distance(p0[0], p0[1], p1[0], p1[1]) >= min_seg_len) {
+                array_push(filtered, p1);
+            }
+        }
+        var last = nav_ray_simplified[array_length(nav_ray_simplified)-1];
+        if (filtered[array_length(filtered)-1] != last) {
+            array_push(filtered, last);
+        }
+    }
+    nav_ray_simplified = filtered;
+
+    // === Player’a gönder
+    nav_ray_send = [];
+    for (var m = 0; m < array_length(nav_ray_simplified); m++) {
+        array_push(nav_ray_send, nav_ray_simplified[m]);
+    }
+    if (array_length(nav_ray_send) == 0) array_push(nav_ray_send, [tx, ty]);
+
+    if (instance_exists(p)) {
+        // Eğer tıklanan nokta zaten player’ın yakınındaysa → path gönderme
+        if (point_distance(p.x, p.y, tx, ty) < 8) {
+            nav_ray_send = [];
+        }
+
+        p.my_points  = nav_ray_send;
+        p.my_index   = -1;
+        p.has_target = false;
+
+        // Yön string’i yaz
+        var dx = tx - p.x;
+        var dy = ty - p.y;
+        var dir_str;
+        if (abs(dx) > abs(dy)) dir_str = (dx < 0) ? "left" : "right";
+        else                   dir_str = (dy < 0) ? "up"   : "down";
+        p.last_dir = dir_str;
+
+        // === Interaction queue ===
+        if (target_inst != noone) {
+            var need_reach = (array_length(nav_ray_send) > 1);
+            with (p) {
+                queue_interaction(target_inst, global.selected_item_name, need_reach);
+            }
+        } else {
+            with (p) {
+                cancel_interaction();
+            }
+        }
+
+        show_debug_message("[NAV->PLAYER] raw=" + string(n) +
+            " simp=" + string(array_length(simp)) +
+            " safe=" + string(array_length(nav_ray_simplified)) +
+            " send=" + string(array_length(nav_ray_send)));
+    }
+
+    target_x = tx;
+    target_y = ty;
+}
+
+// === DEBUG animasyon ===
+if (dbg_animate) {
+    var L = array_length(debug_trace);
+    if (debug_anim_progress < L) {
+        debug_anim_progress = min(debug_anim_progress + dbg_anim_speed, L);
+    }
+}

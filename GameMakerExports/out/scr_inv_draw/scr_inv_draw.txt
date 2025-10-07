@@ -1,0 +1,19 @@
+/// Script : scr_inv_draw
+/// scr_inv_draw(x, y)
+var xx = argument0;
+var yy = argument1;
+var padding = 96;
+
+if (!variable_global_exists("inventory")) exit;
+
+for (var i = 0; i < ds_list_size(global.inventory); i++) {
+    var entry = global.inventory[| i];
+    var itm_id = entry[0];
+    var spr    = entry[1];
+
+    if (sprite_exists(spr)) {
+        draw_sprite(spr, 0, xx + i * padding, yy);
+    } else {
+        draw_text(xx + i * padding, yy, "?");
+    }
+}

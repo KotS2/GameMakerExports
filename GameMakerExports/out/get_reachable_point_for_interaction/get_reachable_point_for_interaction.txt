@@ -1,0 +1,35 @@
+/// Script : get_reachable_point_for_interaction
+
+
+
+function get_reachable_point_for_interaction(inst, sx, sy) {
+    var base_x = inst.x;
+    var base_y = inst.bbox_bottom; // oyuncu genelde alta yaklaşmalı
+    
+    // Önce tam bu noktayı deneyelim
+    if (!collision_point(base_x, base_y, obj_obstacle, true, true)) {
+        return [base_x, base_y];
+    }
+
+    // Etrafında küçük bir halka ara (ör: 4 yön + 4 çapraz)
+    var rr = 12; // px yarıçap
+    var best_pt = undefined;
+    var best_dist = 99999;
+
+    for (var a = 0; a < 360; a += 45) {
+        var nx = base_x + lengthdir_x(rr, a);
+        var ny = base_y + lengthdir_y(rr, a);
+        if (!collision_point(nx, ny, obj_obstacle, true, true)) {
+            var d = point_distance(sx, sy, nx, ny);
+            if (d < best_dist) {
+                best_dist = d;
+                best_pt = [nx, ny];
+            }
+        }
+    }
+
+    if (!is_undefined(best_pt)) return best_pt;
+    
+    // Hiç bulamadıysak → orijinal objenin noktası (fallback)
+    return [base_x, base_y];
+}

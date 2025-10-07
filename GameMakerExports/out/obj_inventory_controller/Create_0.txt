@@ -1,0 +1,94 @@
+/// Object : obj_inventory_controller | Create_0
+
+
+
+
+// === Inventory ayarları ===
+global.inv_bar_height = 96;
+global.inv_item_size  = 64;
+global.inv_padding    = 16;
+global.inv_offset     = 0;
+
+global.inv_open       = false;
+global.inv_selected   = -1;
+
+global.inv_auto_sec   = room_speed * 6; // 6 saniye
+global.inv_timer      = 0;
+
+global.inv_scroll_anim = 0;
+global.block_pickup_one_frame = false;
+
+// === Bildirim listesi ===
+// Her entry: [itm_id, spr, timer]
+if (!variable_global_exists("notif_list")) {
+    global.notif_list = ds_list_create();
+}
+global.notif_dur = room_speed * 4; // 4 saniye ekranda kalır
+
+// === Inventory list guard ===
+// Item listesi [itm_id, spr] formatında
+if (!variable_global_exists("inventory")) {
+    global.inventory = ds_list_create();
+}
+
+// --- Pending fallback güvenlik ---
+// Eğer interaction sırasında hedef instance yoksa, 
+// isim/sprite fallback için bunlar kullanılır
+if (!variable_global_exists("pending_objname")) global.pending_objname = "";
+if (!variable_global_exists("pending_spr"))     global.pending_spr     = -1;
+
+// === Hover isim varsayılanları ===
+global.hover_name_world = "";
+global.hover_name_inv   = "?";
+
+// === Interaction state ===
+if (!variable_global_exists("inv_selected")) global.inv_selected = -1;
+if (!variable_global_exists("pending_use"))  global.pending_use  = noone;
+if (!variable_global_exists("pending_done")) global.pending_done = false;
+"
+/// obj_inventory_controller - Create
+
+
+
+// === Inventory ayarları ===
+global.inv_bar_height = 96;
+global.inv_item_size  = 64;
+global.inv_padding    = 16;
+global.inv_offset     = 0;
+
+global.inv_open       = false;
+global.inv_selected   = -1;
+
+global.inv_auto_sec   = room_speed * 6; // 6 saniye
+global.inv_timer      = 0;
+
+global.inv_scroll_anim = 0;
+global.block_pickup_one_frame = false;
+
+// === Bildirim listesi ===
+// Her entry: [itm_id, spr, timer]
+if (!variable_global_exists("notif_list")) {
+    global.notif_list = ds_list_create();
+}
+global.notif_dur = room_speed * 4; // 4 saniye ekranda kalır
+
+// === Inventory list guard ===
+// Item listesi [itm_id, spr] formatında
+if (!variable_global_exists("inventory")) {
+    global.inventory = ds_list_create();
+}
+
+// --- Pending fallback güvenlik ---
+// Eğer interaction sırasında hedef instance yoksa, 
+// isim/sprite fallback için bunlar kullanılır
+if (!variable_global_exists("pending_objname")) global.pending_objname = "";
+if (!variable_global_exists("pending_spr"))     global.pending_spr     = -1;
+
+// === Hover isim varsayılanları ===
+global.hover_name_world = "";
+global.hover_name_inv   = "?";
+
+// === Interaction state ===
+if (!variable_global_exists("inv_selected")) global.inv_selected = -1;
+if (!variable_global_exists("pending_use"))  global.pending_use  = noone;
+if (!variable_global_exists("pending_done")) global.pending_done = false;

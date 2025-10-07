@@ -1,0 +1,55 @@
+/// Object : obj_UICursor | Draw_75
+
+
+
+
+// Güvenli reset
+draw_set_alpha(1);
+draw_set_color(c_white);
+shader_reset();
+gpu_set_blendmode(bm_normal);
+
+// Pozisyon (Step'te dolduruluyor)
+var px = mx, py = my;
+
+// Sprite (global.cursor_sprite varsa onu kullan)
+var spr = (variable_global_exists("cursor_sprite") && global.cursor_sprite != -1)
+          ? global.cursor_sprite
+          : asset_get_index("spr_cursor");
+
+// Çiz
+if (spr != -1) {
+    var hx = variable_global_exists("cursor_hot_x") ? global.cursor_hot_x : 0;
+    var hy = variable_global_exists("cursor_hot_y") ? global.cursor_hot_y : 0;
+    draw_sprite(spr, 0, px - hx, py - hy);
+} else {
+    // Geçici fallback (görünüyorsa event kesin çalışıyor)
+    draw_line(px-6, py,   px+6, py);
+    draw_line(px,   py-6, px,   py+6);
+}
+"
+/// obj_UICursor.Draw GUI End
+// Güvenli reset
+draw_set_alpha(1);
+draw_set_color(c_white);
+shader_reset();
+gpu_set_blendmode(bm_normal);
+
+// Pozisyon (Step'te dolduruluyor)
+var px = mx, py = my;
+
+// Sprite (global.cursor_sprite varsa onu kullan)
+var spr = (variable_global_exists("cursor_sprite") && global.cursor_sprite != -1)
+          ? global.cursor_sprite
+          : asset_get_index("spr_cursor");
+
+// Çiz
+if (spr != -1) {
+    var hx = variable_global_exists("cursor_hot_x") ? global.cursor_hot_x : 0;
+    var hy = variable_global_exists("cursor_hot_y") ? global.cursor_hot_y : 0;
+    draw_sprite(spr, 0, px - hx, py - hy);
+} else {
+    // Geçici fallback (görünüyorsa event kesin çalışıyor)
+    draw_line(px-6, py,   px+6, py);
+    draw_line(px,   py-6, px,   py+6);
+}

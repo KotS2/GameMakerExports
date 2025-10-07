@@ -1,0 +1,42 @@
+/// Script : scr_show_failmsg
+
+
+
+function scr_show_failmsg() {
+    
+    // INI dosyasından mesajları yükle
+    var ini_file = "fail_msg_" + global.current_language + ".ini"; // global.current_language = "en" veya "tr"
+    
+    // Dosya var mı kontrol
+    if (!file_exists(ini_file)) {
+        show_debug_message("[ERROR] Fail message INI not found: " + ini_file);
+        // Fallback mesaj
+        scr_show_message("???", false);
+        return;
+    }
+    
+    // INI aç
+    ini_open(ini_file);
+    
+    // Kaç mesaj var?
+    var msg_count = ini_read_real("fail_messages", "count", 10);
+    
+    // Rastgele index seç
+    var random_index = irandom(msg_count - 1);
+    
+    // Mesajı oku (msg_0, msg_1, msg_2 ... formatında)
+    var fail_msg = ini_read_string("fail_messages", "msg_" + string(random_index), "???");
+    
+    // INI kapat
+    ini_close();
+    
+    // Mesajı göster (kısa, 2sn)
+    scr_show_message(fail_msg, false);
+    
+    // Başarısız kombinasyon sesi (varsa)
+    if (audio_exists(snd_fail_combine)) {
+        audio_play_sound(snd_fail_combine, 1, false);
+    }
+    
+    show_debug_message("[FAIL] Showed message: " + fail_msg);
+}

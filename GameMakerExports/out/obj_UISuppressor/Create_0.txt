@@ -1,0 +1,19 @@
+/// Object : obj_UISuppressor | Create_0
+
+
+
+
+prev_supp  = global.cursor_suppressed;
+prev_inter = global.ui_interaction_enabled;
+
+global.cursor_suppressed      = true;   // özel imleç yok
+global.ui_interaction_enabled = false;  // tıklama/klavye yok
+window_set_cursor(cr_none);             // OS imleci de yok
+"
+/// obj_UISuppressor.Create
+prev_supp  = global.cursor_suppressed;
+prev_inter = global.ui_interaction_enabled;
+
+global.cursor_suppressed      = true;   // özel imleç yok
+global.ui_interaction_enabled = false;  // tıklama/klavye yok
+window_set_cursor(cr_none);             // OS imleci de yok

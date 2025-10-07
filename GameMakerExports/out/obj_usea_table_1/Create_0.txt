@@ -1,0 +1,11 @@
+/// Object : obj_usea_table_1 | Create_0
+
+
+
+
+sprite_index = spr_table;   // Görünür sprite
+mask_index   = spr_table;   // Çarpışma için aynı sprite
+"
+/// obj_table - Create
+sprite_index = spr_table;   // Görünür sprite
+mask_index   = spr_table;   // Çarpışma için aynı sprite

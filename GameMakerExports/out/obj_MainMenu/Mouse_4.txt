@@ -1,0 +1,33 @@
+/// Object : obj_MainMenu | Mouse_4
+
+
+
+
+for (var i = 0; i < array_length(button_areas); i++) {
+    var b = button_areas[i];
+    if (point_in_rectangle(mouse_x, mouse_y, b[0], b[1], b[0] + b[2], b[1] + b[3])) {
+        switch(i) {
+            case 0:
+                if (continue_enabled) room_goto(Main_Game); break;
+            case 1: room_goto(Main_Game); break;
+            case 2: room_goto(Load_Game); break;
+            case 3: room_goto(Options); break;
+            case 4: game_end(); break;
+        }
+    }
+}
+"
+//obj_MainMenu Left Pressed
+for (var i = 0; i < array_length(button_areas); i++) {
+    var b = button_areas[i];
+    if (point_in_rectangle(mouse_x, mouse_y, b[0], b[1], b[0] + b[2], b[1] + b[3])) {
+        switch(i) {
+            case 0:
+                if (continue_enabled) room_goto(Main_Game); break;
+            case 1: room_goto(Main_Game); break;
+            case 2: room_goto(Load_Game); break;
+            case 3: room_goto(Options); break;
+            case 4: game_end(); break;
+        }
+    }
+}

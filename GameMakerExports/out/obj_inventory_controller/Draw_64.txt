@@ -1,0 +1,290 @@
+/// Object : obj_inventory_controller | Draw_64
+
+
+
+
+var sw = display_get_gui_width();
+var sh = display_get_gui_height();
+var bar_y = sh - global.inv_bar_height;
+
+// === Bildirim çizimleri ===
+var notif_size = 60; // kutu boyutu (envanter slotuna eşit)
+
+for (var i = 0; i < ds_list_size(global.notif_list); i++) {
+    var n   = global.notif_list[| i];
+    var itm = n[0];
+    var spr = n[1];
+    var t   = n[2]; // kalan süre
+
+    var total_dur  = global.notif_dur;      // 4 sn
+    var blink_time = total_dur * 0.25;     // ~1.5 sn
+    var solid_time = total_dur * 0.375;      // ~1.0 sn
+    var fade_time  = total_dur - (blink_time + solid_time); // ~1.5 sn
+
+    // Pozisyon (sağ üst)
+    var x1 = display_get_gui_width() - notif_size - 16;
+    var y1 = 16 + i * (notif_size + 8);
+
+    // --- Arka kutu (sabit) ---
+    draw_set_alpha(1);
+    draw_set_color(make_color_rgb(30,30,30));
+    draw_rectangle(x1, y1, x1 + notif_size, y1 + notif_size, false);
+    draw_set_color(c_white);
+    draw_rectangle(x1, y1, x1 + notif_size, y1 + notif_size, true);
+
+    // --- Item sprite (3 aşama) ---
+    var sprite_alpha = 1;
+
+    if (t > total_dur - blink_time) {
+        // Blink dönemi
+        sprite_alpha = (sin(current_time / 80) > 0) ? 1 : 0.2;
+    }
+    else if (t > fade_time) {
+        // Solid (sabit opak)
+        sprite_alpha = 1;
+    }
+    else {
+        // Fade out dönemi
+        sprite_alpha = clamp(t / fade_time, 0, 1);
+    }
+
+    draw_set_alpha(sprite_alpha);
+    if (sprite_exists(spr)) {
+        draw_sprite_stretched(spr, 0, x1, y1, notif_size, notif_size);
+    }
+}
+
+// Reset
+draw_set_alpha(1);
+draw_set_color(c_white);
+
+// === Inventory Bar ===
+if (global.inv_open) {
+    draw_set_alpha(0.5);
+    draw_set_color(c_black);
+    draw_rectangle(0, bar_y, sw, sh, false);
+
+    draw_set_alpha(1);
+    draw_set_color(c_gray);
+    draw_rectangle(0, bar_y, sw, sh, true);
+
+    var count = ds_list_size(global.inventory);
+    var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+    var ypos  = bar_y + global.inv_padding;
+    var mx = device_mouse_x(0);
+    var my = device_mouse_y(0);
+
+    for (var i = 0; i < count; i++) {
+        var entry  = global.inventory[| i];
+        var itm_id = entry[0];
+        var spr    = entry[1];
+
+        var xx = xpos + global.inv_item_size/2;
+        var yy = ypos + global.inv_item_size/2;
+
+        var alpha = (global.inv_selected == i) ? 0.5 : 1;
+
+        if (sprite_exists(spr)) {
+            var bounce = (global.inv_scroll_anim > 0) ? (2 * sin(global.inv_scroll_anim * 0.5)) : 0;
+            draw_sprite_ext(spr, 0, xx, yy + bounce,
+                global.inv_item_size / sprite_get_width(spr),
+                global.inv_item_size / sprite_get_height(spr),
+                0, c_white, alpha);
+        } else {
+            draw_rectangle(xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size, true);
+            draw_text(xpos+8, ypos+8, itm_id);
+        }
+
+        // Hover outline
+        if (point_in_rectangle(mx, my, xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size)) {
+            draw_set_alpha(1);
+            draw_set_color(c_gray);
+            draw_rectangle(xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size, true);
+        }
+
+        xpos += global.inv_item_size + global.inv_padding;
+    }
+}
+
+// === Seçili item mouse’a yapışık ===
+if (global.inv_selected != -1) {
+    var entry = global.inventory[| global.inv_selected];
+    var spr   = entry[1];
+
+    if (sprite_exists(spr)) {
+        var scale_x = global.inv_item_size / sprite_get_width(spr);
+        var scale_y = global.inv_item_size / sprite_get_height(spr);
+
+        draw_sprite_ext(
+            spr, 0,
+            device_mouse_x(0), device_mouse_y(0),
+            scale_x, scale_y, 0, c_white, 1
+        );
+    }
+}
+
+// === Hover item adı ===
+if (global.inv_open) {
+    var sw = display_get_gui_width();
+    var sh = display_get_gui_height();
+    var bar_y = sh - global.inv_bar_height;
+
+    // isim boş değilse göster (isim olabilir ya da "?" fallback olabilir)
+    if (global.hover_name_inv != "") {
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_bottom);
+        draw_set_color(c_white);
+
+        var text_x = sw * 0.5;
+        var text_y = bar_y - 8;
+
+        draw_text(text_x, text_y, global.hover_name_inv);
+
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
+    }
+}
+
+"
+/// obj_inventory_controller - Draw GUI
+var sw = display_get_gui_width();
+var sh = display_get_gui_height();
+var bar_y = sh - global.inv_bar_height;
+
+// === Bildirim çizimleri ===
+var notif_size = 60; // kutu boyutu (envanter slotuna eşit)
+
+for (var i = 0; i < ds_list_size(global.notif_list); i++) {
+    var n   = global.notif_list[| i];
+    var itm = n[0];
+    var spr = n[1];
+    var t   = n[2]; // kalan süre
+
+    var total_dur  = global.notif_dur;      // 4 sn
+    var blink_time = total_dur * 0.25;     // ~1.5 sn
+    var solid_time = total_dur * 0.375;      // ~1.0 sn
+    var fade_time  = total_dur - (blink_time + solid_time); // ~1.5 sn
+
+    // Pozisyon (sağ üst)
+    var x1 = display_get_gui_width() - notif_size - 16;
+    var y1 = 16 + i * (notif_size + 8);
+
+    // --- Arka kutu (sabit) ---
+    draw_set_alpha(1);
+    draw_set_color(make_color_rgb(30,30,30));
+    draw_rectangle(x1, y1, x1 + notif_size, y1 + notif_size, false);
+    draw_set_color(c_white);
+    draw_rectangle(x1, y1, x1 + notif_size, y1 + notif_size, true);
+
+    // --- Item sprite (3 aşama) ---
+    var sprite_alpha = 1;
+
+    if (t > total_dur - blink_time) {
+        // Blink dönemi
+        sprite_alpha = (sin(current_time / 80) > 0) ? 1 : 0.2;
+    }
+    else if (t > fade_time) {
+        // Solid (sabit opak)
+        sprite_alpha = 1;
+    }
+    else {
+        // Fade out dönemi
+        sprite_alpha = clamp(t / fade_time, 0, 1);
+    }
+
+    draw_set_alpha(sprite_alpha);
+    if (sprite_exists(spr)) {
+        draw_sprite_stretched(spr, 0, x1, y1, notif_size, notif_size);
+    }
+}
+
+// Reset
+draw_set_alpha(1);
+draw_set_color(c_white);
+
+// === Inventory Bar ===
+if (global.inv_open) {
+    draw_set_alpha(0.5);
+    draw_set_color(c_black);
+    draw_rectangle(0, bar_y, sw, sh, false);
+
+    draw_set_alpha(1);
+    draw_set_color(c_gray);
+    draw_rectangle(0, bar_y, sw, sh, true);
+
+    var count = ds_list_size(global.inventory);
+    var xpos  = global.inv_padding - global.inv_offset * (global.inv_item_size + global.inv_padding);
+    var ypos  = bar_y + global.inv_padding;
+    var mx = device_mouse_x(0);
+    var my = device_mouse_y(0);
+
+    for (var i = 0; i < count; i++) {
+        var entry  = global.inventory[| i];
+        var itm_id = entry[0];
+        var spr    = entry[1];
+
+        var xx = xpos + global.inv_item_size/2;
+        var yy = ypos + global.inv_item_size/2;
+
+        var alpha = (global.inv_selected == i) ? 0.5 : 1;
+
+        if (sprite_exists(spr)) {
+            var bounce = (global.inv_scroll_anim > 0) ? (2 * sin(global.inv_scroll_anim * 0.5)) : 0;
+            draw_sprite_ext(spr, 0, xx, yy + bounce,
+                global.inv_item_size / sprite_get_width(spr),
+                global.inv_item_size / sprite_get_height(spr),
+                0, c_white, alpha);
+        } else {
+            draw_rectangle(xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size, true);
+            draw_text(xpos+8, ypos+8, itm_id);
+        }
+
+        // Hover outline
+        if (point_in_rectangle(mx, my, xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size)) {
+            draw_set_alpha(1);
+            draw_set_color(c_gray);
+            draw_rectangle(xpos, ypos, xpos+global.inv_item_size, ypos+global.inv_item_size, true);
+        }
+
+        xpos += global.inv_item_size + global.inv_padding;
+    }
+}
+
+// === Seçili item mouse’a yapışık ===
+if (global.inv_selected != -1) {
+    var entry = global.inventory[| global.inv_selected];
+    var spr   = entry[1];
+
+    if (sprite_exists(spr)) {
+        var scale_x = global.inv_item_size / sprite_get_width(spr);
+        var scale_y = global.inv_item_size / sprite_get_height(spr);
+
+        draw_sprite_ext(
+            spr, 0,
+            device_mouse_x(0), device_mouse_y(0),
+            scale_x, scale_y, 0, c_white, 1
+        );
+    }
+}
+
+// === Hover item adı ===
+if (global.inv_open) {
+    var sw = display_get_gui_width();
+    var sh = display_get_gui_height();
+    var bar_y = sh - global.inv_bar_height;
+
+    // isim boş değilse göster (isim olabilir ya da "?" fallback olabilir)
+    if (global.hover_name_inv != "") {
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_bottom);
+        draw_set_color(c_white);
+
+        var text_x = sw * 0.5;
+        var text_y = bar_y - 8;
+
+        draw_text(text_x, text_y, global.hover_name_inv);
+
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
+    }
+}

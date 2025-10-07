@@ -1,0 +1,19 @@
+/// Object : obj_UICursor | Step_0
+
+
+
+
+// OS imlecini HER KARE gizle
+window_set_cursor(cr_none);
+
+// GUI koordinatı (menü/GUI ile aynı tuval)
+mx = device_mouse_x_to_gui(0);
+my = device_mouse_y_to_gui(0);
+"
+/// obj_UICursor.Step
+// OS imlecini HER KARE gizle
+window_set_cursor(cr_none);
+
+// GUI koordinatı (menü/GUI ile aynı tuval)
+mx = device_mouse_x_to_gui(0);
+my = device_mouse_y_to_gui(0);

@@ -1,0 +1,39 @@
+/// Script : scr_show_message
+
+
+
+
+
+function scr_show_message(txt, force_long = false) {
+    
+    // Balon kontrolü
+    if (!instance_exists(obj_speechbubble)) {
+        show_debug_message("[MSG] speechbubble sahnede yok!");
+        return false;
+    }
+    
+    // Balon objesi
+    var bubble = obj_speechbubble;
+    
+    // Yazıyı ata
+    bubble.text = txt;
+    
+    // Süre hesapla
+    if (force_long) {
+        // Diyalog → minimum 6sn + kelime başına 0.5sn
+        var word_count = string_wordcount(txt);
+        bubble.timer = max(room_speed * 6, round(room_speed * 0.5 * word_count));
+    } else {
+        // Kısa açıklama → sabit 2sn
+        bubble.timer = room_speed * 2;
+    }
+    
+    // Pozisyonu oyuncuya sabitle
+    if (instance_exists(obj_player)) {
+        bubble.parent_id = obj_player;
+        bubble.x = obj_player.x;
+        bubble.y = obj_player.y - 64;
+    }
+    
+    return true;
+}

@@ -1,0 +1,9 @@
+/// Script : scr_sprite_name_safe
+/// scr_sprite_name_safe(_id)
+function scr_sprite_name_safe(_id) {
+    if (is_undefined(_id)) return "undefined";
+    if (!is_real(_id)) return "not_real";
+    if (_id < 0) return "none";
+    if (!sprite_exists(_id)) return "invalid";
+    return asset_get_name(_id);}
+return "not_real";

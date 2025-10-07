@@ -1,0 +1,37 @@
+/// Object : obj_MainMenu | Mouse_61
+
+
+
+
+var view_h = display_get_gui_height();
+if (state == "load") {
+    var content_h = global.save_slots * 56 + 18;
+    var panel_top = first_y - slide * slide_px + (open_index + 1)*(bar_h+gap) + 6;
+    var max_scroll = max(0, (panel_top + content_h) - (view_h - 20));
+	var content_h = global.save_slots * 56 + 18 + footer_h;
+    load_scroll = clamp(load_scroll + scroll_step, 0, max_scroll);
+}
+else if (state == "options") {
+    var content_h = 8*42 + 36;
+    var panel_top = first_y - slide * slide_px + (open_index + 1)*(bar_h+gap) + 6;
+    var max_scroll = max(0, (panel_top + content_h) - (view_h - 20));
+	var content_h = 8*42 + 36 + footer_h;
+    opt_scroll = clamp(opt_scroll + scroll_step, 0, max_scroll);
+}
+"
+//obj_MainMenu Mheel DOWN
+var view_h = display_get_gui_height();
+if (state == "load") {
+    var content_h = global.save_slots * 56 + 18;
+    var panel_top = first_y - slide * slide_px + (open_index + 1)*(bar_h+gap) + 6;
+    var max_scroll = max(0, (panel_top + content_h) - (view_h - 20));
+	var content_h = global.save_slots * 56 + 18 + footer_h;
+    load_scroll = clamp(load_scroll + scroll_step, 0, max_scroll);
+}
+else if (state == "options") {
+    var content_h = 8*42 + 36;
+    var panel_top = first_y - slide * slide_px + (open_index + 1)*(bar_h+gap) + 6;
+    var max_scroll = max(0, (panel_top + content_h) - (view_h - 20));
+	var content_h = 8*42 + 36 + footer_h;
+    opt_scroll = clamp(opt_scroll + scroll_step, 0, max_scroll);
+}

@@ -1,0 +1,14 @@
+/// Object : obj_speechbubble | Create_0
+
+
+
+
+bubble_msg = "?";
+timer      = room_speed * 1.5;
+parent_id = noone;
+
+"
+// obj_speechbubble Create
+bubble_msg = "?";
+timer      = room_speed * 1.5;
+parent_id = noone;

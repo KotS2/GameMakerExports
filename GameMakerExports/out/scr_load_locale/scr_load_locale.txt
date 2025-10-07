@@ -1,0 +1,69 @@
+/// Script : scr_load_locale
+/// scr_load_locale(lang)
+function scr_load_locale(_lang = "eng") {
+
+    var fname_itm = _lang + "_itm.ini";
+    var fname_msg = _lang + "_msg.ini";
+
+    if (!variable_global_exists("locale_items"))  global.locale_items  = ds_map_create();
+    if (!variable_global_exists("fail_msgs"))     global.fail_msgs     = ds_list_create();
+    if (!variable_global_exists("success_msgs"))  global.success_msgs  = ds_map_create();
+
+    ds_map_clear(global.locale_items);
+    ds_list_clear(global.fail_msgs);
+    ds_map_clear(global.success_msgs);
+
+    // ===========================================================
+    // === ITEM INI ===
+    // ===========================================================
+    if (file_exists(fname_itm)) {
+        ini_open(fname_itm);
+
+        var first_section = ini_section_first();
+        if (first_section != "") {
+            var sect = first_section;
+            while (sect != "") {
+                var item_map = ds_map_create();
+                item_map[? "name"] = ini_read_string(sect, "name", "?");
+                item_map[? "desc"] = ini_read_string(sect, "desc", "?");
+                global.locale_items[? sect] = item_map;
+                sect = ini_section_next();
+            }
+        } else {
+            show_debug_message("[LOCALE] INI içinde section bulunamadı: " + fname_itm);
+        }
+
+        ini_close();
+    } else {
+        show_debug_message("[LOCALE] Missing ini file: " + fname_itm);
+    }
+
+    // ===========================================================
+    // === MESSAGE INI ===
+    // ===========================================================
+    if (file_exists(fname_msg)) {
+        ini_open(fname_msg);
+
+        // --- Fail mesajları ---
+        var i = 1;
+        while (true) {
+            var key = "msg" + string(i);
+            if (!ini_key_exists("fail", key)) break;
+            ds_list_add(global.fail_msgs, ini_read_string("fail", key, "?"));
+            i++;
+        }
+
+        // --- Success mesajları ---
+        var key_succ = ini_key_first("success");
+        while (key_succ != "") {
+            global.success_msgs[? key_succ] = ini_read_string("success", key_succ, "?");
+            key_succ = ini_key_next("success");
+        }
+
+        ini_close();
+    } else {
+        show_debug_message("[LOCALE] Missing ini file: " + fname_msg);
+    }
+
+    show_debug_message("[LOCALE] Locale load complete for language: " + _lang);
+}

@@ -1,0 +1,290 @@
+/// Object : obj_MainMenu | Create_0
+
+
+
+
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    return (ds_exists(mm, ds_type_map) && ds_map_exists(mm, key)) ? string(mm[? key]) : def;
+};
+
+// --- Layout'u her çözünürlükte güncelleyen yardımcı ---
+	footer_h = 28; // panel altındaki sabit footer yüksekliği
+recalc_layout = function() {
+    gui_w = display_get_gui_width();
+    gui_h = display_get_gui_height();
+
+    container_w = 680;
+    bar_h       = 68;
+    gap         = 16;
+    first_y     = gui_h * 0.32;
+    x_center    = gui_w * 0.5;
+    x1          = x_center - container_w * 0.5;
+    x2          = x_center + container_w * 0.5;
+};
+
+// ilk çağrı
+recalc_layout();
+
+// Scroll ve drag state
+load_scroll = 0;
+opt_scroll  = 0;
+scroll_step = 48;
+drag_slider = -1;   // -1=drag yok, 0..3 slider index
+
+// Hover bayrakları (oklar için)
+hover_res_left  = false;
+hover_res_right = false;
+hover_sub_left  = false;
+hover_sub_right = false;
+hover_voi_left  = false;
+hover_voi_right = false;
+
+pal_base = [
+    make_color_rgb(210,140, 60), // Continue
+    make_color_rgb(231,108, 57), // New
+    make_color_rgb(121, 94,169), // Load
+    make_color_rgb( 58,130,171), // Options
+    make_color_rgb( 44, 48, 54)  // Exit
+];
+pal_hi = [
+    make_color_rgb(255,195,120),
+    make_color_rgb(255,150,116),
+    make_color_rgb(170,150,225),
+    make_color_rgb(112,180,220),
+    make_color_rgb( 86, 94,104)
+];
+col_disabled = make_color_rgb(110,110,110);
+
+fnt = global.font_menu;
+
+// Continue uygun mu?
+var last_slot = -1, last_time = -1;
+for (var i = 0; i < global.save_slots; i++) {
+    var s = global.save_data[i];
+    if (!is_undefined(s)) {
+        var t = real(s[? "timestamp"]);
+        if (t > last_time) { last_time = t; last_slot = i; }
+    }
+}
+can_continue = (last_slot != -1);
+global.__last_continue_slot = last_slot;
+
+// Menü kalemleri
+var m = global.lang_menu;
+items = [
+    { key:"Continue",  label:m[? "Continue"],  enabled:can_continue,  hover:0, sheen:-0.35 },
+    { key:"New",       label:m[? "New_Game"],  enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Load",      label:m[? "Load_Game"], enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Options",   label:m[? "Options"],   enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Exit",      label:m[? "Exit"],      enabled:true,          hover:0, sheen:-0.35 },
+];
+
+// İlk seçili
+sel = 0;
+for (var i = 0; i < array_length(items); i++) if (items[i].enabled) { sel = i; break; }
+
+bg_t = 0;
+
+// Slide paneller
+state        = "root";    // root | load | options
+slide        = 0;
+slide_target = 0;
+slide_px     = 180;
+open_index   = -1;
+
+// --- Aksiyon çağırıcı ---
+menu_activate = function(i) {
+    var key = items[i].key;
+    switch (key) {
+        case "Continue":
+            if (can_continue) scr_load_game(global.__last_continue_slot);
+            break;
+      case "New":
+{
+    // Herhangi bir slot dolu mu?
+    var any_filled = false;
+    for (var s = 0; s < global.save_slots; s++) {
+        if (!is_undefined(global.save_data[s])) { any_filled = true; break; }
+    }
+
+    if (!any_filled) {
+        // DOLU YOK → direkt oyuna gir
+        room_goto(Loading); // <<< başlangıç odanı yaz (ör: Intro1)
+    } else {
+        // DOLU VAR → onay penceresi
+        confirm_active = true;
+    }
+}
+break;
+
+        case "Load":
+        case "Options":
+            // Slide ile açılıyor
+            break;
+        case "Exit":
+            game_end();
+            break;
+    }
+};
+
+// --- Dil değişince etiket yenile ---
+function refresh_labels() {
+    var m = global.lang_menu;
+    for (var i = 0; i < array_length(items); i++) {
+        switch (items[i].key) {
+            case "Continue": items[i].label = m[? "Continue"]; break;
+            case "New":      items[i].label = m[? "New_Game"]; break;
+            case "Load":     items[i].label = m[? "Load_Game"]; break;
+            case "Options":  items[i].label = m[? "Options"]; break;
+            case "Exit":     items[i].label = m[? "Exit"]; break;
+        }
+    }
+}
+confirm_active = false;
+confirm_hover_yes = 0;
+confirm_hover_no  = 0;
+"
+/// obj_MainMenu.Create
+
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    return (ds_exists(mm, ds_type_map) && ds_map_exists(mm, key)) ? string(mm[? key]) : def;
+};
+
+// --- Layout'u her çözünürlükte güncelleyen yardımcı ---
+	footer_h = 28; // panel altındaki sabit footer yüksekliği
+recalc_layout = function() {
+    gui_w = display_get_gui_width();
+    gui_h = display_get_gui_height();
+
+    container_w = 680;
+    bar_h       = 68;
+    gap         = 16;
+    first_y     = gui_h * 0.32;
+    x_center    = gui_w * 0.5;
+    x1          = x_center - container_w * 0.5;
+    x2          = x_center + container_w * 0.5;
+};
+
+// ilk çağrı
+recalc_layout();
+
+// Scroll ve drag state
+load_scroll = 0;
+opt_scroll  = 0;
+scroll_step = 48;
+drag_slider = -1;   // -1=drag yok, 0..3 slider index
+
+// Hover bayrakları (oklar için)
+hover_res_left  = false;
+hover_res_right = false;
+hover_sub_left  = false;
+hover_sub_right = false;
+hover_voi_left  = false;
+hover_voi_right = false;
+
+pal_base = [
+    make_color_rgb(210,140, 60), // Continue
+    make_color_rgb(231,108, 57), // New
+    make_color_rgb(121, 94,169), // Load
+    make_color_rgb( 58,130,171), // Options
+    make_color_rgb( 44, 48, 54)  // Exit
+];
+pal_hi = [
+    make_color_rgb(255,195,120),
+    make_color_rgb(255,150,116),
+    make_color_rgb(170,150,225),
+    make_color_rgb(112,180,220),
+    make_color_rgb( 86, 94,104)
+];
+col_disabled = make_color_rgb(110,110,110);
+
+fnt = global.font_menu;
+
+// Continue uygun mu?
+var last_slot = -1, last_time = -1;
+for (var i = 0; i < global.save_slots; i++) {
+    var s = global.save_data[i];
+    if (!is_undefined(s)) {
+        var t = real(s[? "timestamp"]);
+        if (t > last_time) { last_time = t; last_slot = i; }
+    }
+}
+can_continue = (last_slot != -1);
+global.__last_continue_slot = last_slot;
+
+// Menü kalemleri
+var m = global.lang_menu;
+items = [
+    { key:"Continue",  label:m[? "Continue"],  enabled:can_continue,  hover:0, sheen:-0.35 },
+    { key:"New",       label:m[? "New_Game"],  enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Load",      label:m[? "Load_Game"], enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Options",   label:m[? "Options"],   enabled:true,          hover:0, sheen:-0.35 },
+    { key:"Exit",      label:m[? "Exit"],      enabled:true,          hover:0, sheen:-0.35 },
+];
+
+// İlk seçili
+sel = 0;
+for (var i = 0; i < array_length(items); i++) if (items[i].enabled) { sel = i; break; }
+
+bg_t = 0;
+
+// Slide paneller
+state        = "root";    // root | load | options
+slide        = 0;
+slide_target = 0;
+slide_px     = 180;
+open_index   = -1;
+
+// --- Aksiyon çağırıcı ---
+menu_activate = function(i) {
+    var key = items[i].key;
+    switch (key) {
+        case "Continue":
+            if (can_continue) scr_load_game(global.__last_continue_slot);
+            break;
+      case "New":
+{
+    // Herhangi bir slot dolu mu?
+    var any_filled = false;
+    for (var s = 0; s < global.save_slots; s++) {
+        if (!is_undefined(global.save_data[s])) { any_filled = true; break; }
+    }
+
+    if (!any_filled) {
+        // DOLU YOK → direkt oyuna gir
+        room_goto(Loading); // <<< başlangıç odanı yaz (ör: Intro1)
+    } else {
+        // DOLU VAR → onay penceresi
+        confirm_active = true;
+    }
+}
+break;
+
+        case "Load":
+        case "Options":
+            // Slide ile açılıyor
+            break;
+        case "Exit":
+            game_end();
+            break;
+    }
+};
+
+// --- Dil değişince etiket yenile ---
+function refresh_labels() {
+    var m = global.lang_menu;
+    for (var i = 0; i < array_length(items); i++) {
+        switch (items[i].key) {
+            case "Continue": items[i].label = m[? "Continue"]; break;
+            case "New":      items[i].label = m[? "New_Game"]; break;
+            case "Load":     items[i].label = m[? "Load_Game"]; break;
+            case "Options":  items[i].label = m[? "Options"]; break;
+            case "Exit":     items[i].label = m[? "Exit"]; break;
+        }
+    }
+}
+confirm_active = false;
+confirm_hover_yes = 0;
+confirm_hover_no  = 0;

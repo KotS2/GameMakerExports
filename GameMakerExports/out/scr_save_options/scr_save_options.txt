@@ -1,0 +1,18 @@
+/// Script : scr_save_options
+//scr_save_options
+function scr_save_options() {
+    var j = {
+        music: global.opt_music,
+        voi:   global.opt_voi,
+        sfx:   global.opt_sfx,
+        amb:   global.opt_amb,
+        fs:    global.opt_fullscreen,
+        res:   global.opt_res_index,
+        sub:   global.opt_sub_lang,
+        voi_lang: global.opt_voi_lang
+    };
+    var b = buffer_create(4096, buffer_grow, 1);
+    buffer_write(b, buffer_string, json_stringify(j));
+    buffer_save(b, "options.json");
+    buffer_delete(b);
+}

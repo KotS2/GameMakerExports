@@ -1,0 +1,40 @@
+/// Object : obj_loader | Create_0
+
+
+
+
+// Yüklenecek sprite ID'lerini diziye koy
+assets = [
+    //spr_on_idle, spr_on, spr_sag, spr_sol, spr_ark,
+	//spr_ark_dur, spr_ark_idle, spr_on_dur,
+	//spr_sag_dur, spr_sag_idle, spr_sol_dur, spr_sol_idle,
+   // spr_soldan_saga, spr_soldan_arkaya, spr_soldan_karsiya,
+  //  spr_sagdan_sola, spr_sagdan_arkaya, spr_sagdan_karsiya,
+  //  spr_arkadan_one, spr_arkadan_sola, spr_arkadan_saga,
+   // spr_karsidan_arkaya, spr_karsidan_sola, spr_karsidan_saga,
+	//spr_arkadan_ayakta, spr_arkadan_yerden, spr_karsidan_ayakta,
+	//spr_karsidan_yerden, spr_sagdan_ayakta, spr_sagdan_yerden,
+	//spr_soldan_ayakta, spr_soldan_yerden
+];
+
+// Kaçıncı sprite'a kadar yükleme yapıldığını takip eder
+progress = 0;
+global.scr_cursor_set_depth(global.CURSOR_DEPTH_BOTTOM);"
+/// obj_loader - Create
+// Yüklenecek sprite ID'lerini diziye koy
+assets = [
+    //spr_on_idle, spr_on, spr_sag, spr_sol, spr_ark,
+	//spr_ark_dur, spr_ark_idle, spr_on_dur,
+	//spr_sag_dur, spr_sag_idle, spr_sol_dur, spr_sol_idle,
+   // spr_soldan_saga, spr_soldan_arkaya, spr_soldan_karsiya,
+  //  spr_sagdan_sola, spr_sagdan_arkaya, spr_sagdan_karsiya,
+  //  spr_arkadan_one, spr_arkadan_sola, spr_arkadan_saga,
+   // spr_karsidan_arkaya, spr_karsidan_sola, spr_karsidan_saga,
+	//spr_arkadan_ayakta, spr_arkadan_yerden, spr_karsidan_ayakta,
+	//spr_karsidan_yerden, spr_sagdan_ayakta, spr_sagdan_yerden,
+	//spr_soldan_ayakta, spr_soldan_yerden
+];
+
+// Kaçıncı sprite'a kadar yükleme yapıldığını takip eder
+progress = 0;
+global.scr_cursor_set_depth(global.CURSOR_DEPTH_BOTTOM);

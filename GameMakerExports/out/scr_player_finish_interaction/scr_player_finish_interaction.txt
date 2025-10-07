@@ -1,0 +1,181 @@
+/// Script : scr_player_finish_interaction
+//scr_player_finish_interaction
+
+function scr_player_finish_interaction() {
+    // === GÜVENLİK ===
+    if (!variable_global_exists("pending_objname") || !variable_global_exists("pending_spr")) {
+        show_debug_message("[ERR] pending değişkenleri tanımlı değil!");
+        return;
+    }
+
+    var nm  = string_lower(global.pending_objname);
+    var spr = global.pending_spr;
+
+    if (nm == "") {
+        show_debug_message("[ERR] Hedef adı boş, itm geri dönüyor!");
+        global.inv_selected = -1;
+        return;
+    }
+
+    // --- Inventory’den seçilen item ---
+    var itm_id = "";
+    if (global.inv_selected != -1) {
+        var entry = global.inventory[| global.inv_selected];
+        if (is_array(entry)) itm_id = entry[0];
+    }
+
+    // ===========================================================
+    // === TKNA / TKNY OBJESİ (world item → inventory) ===========
+    // ===========================================================
+    if (string_copy(nm, 1, 9) == "obj_tkna_" || string_copy(nm, 1, 9) == "obj_tkny_") {
+        var new_itm = scr_get_item_id(nm);
+        if (new_itm != "") {
+            show_debug_message("[PICKUP] Envantere ekleniyor → " + new_itm);
+            scr_inv_add(new_itm, spr);
+
+            // Sahnedeki objeyi yok et
+            with (all) {
+                if (string_lower(object_get_name(object_index)) == nm) instance_destroy();
+            }
+
+            // Ses & mesaj
+            if (ds_map_exists(global.lang_itm, new_itm)) {
+                var item_map = global.lang_itm[? new_itm];
+                if (ds_map_exists(item_map, "pickup_msg")) {
+                    scr_show_message(item_map[? "pickup_msg"]);
+                }
+
+                if (ds_map_exists(global.lang_voi, new_itm)) {
+                    var vdata = global.lang_voi[? new_itm];
+                    var snd = vdata[? "file"];
+                    if (snd != "") audio_play_sound(asset_get_index(snd), 1, false);
+                }
+            }
+        } else {
+            show_debug_message("[ERR] scr_get_item_id boş döndü!");
+        }
+
+        global.inv_selected = -1;
+        global.pending_objname = "";
+        global.pending_use = noone;
+        global.pending_done = false;
+        return;
+    }
+
+    // ===========================================================
+    // === USE / BTN OBJELERİ ====================================
+    // ===========================================================
+    if (string_copy(nm, 1, 7) == "obj_use" || string_copy(nm, 1, 7) == "obj_btn") {
+
+        if (itm_id == "") {
+            scr_show_message("?", true);
+            global.inv_selected = -1;
+            return;
+        }
+
+        if (!ds_map_exists(global.item_rules, itm_id)) {
+            scr_show_message("?", true);
+            global.inv_selected = -1;
+            return;
+        }
+
+        var rules = global.item_rules[? itm_id];
+        var hedef_ad = nm;
+        var matched = false;
+
+        // === Çoklu kombinasyon desteği ===
+        if (ds_exists(rules, ds_type_map)) {
+            var keylist = ds_map_keys(rules);
+            for (var i = 0; i < array_length(keylist); i++) {
+                var combo = keylist[i];
+                var sub = rules[? combo];
+                if (ds_map_exists(sub, "neyle_birlesecek") && sub[? "neyle_birlesecek"] == hedef_ad) {
+                    rules = sub;
+                    matched = true;
+                    break;
+                }
+            }
+            ds_list_destroy(keylist);
+        }
+
+        if (!matched && (!ds_map_exists(rules, "neyle_birlesecek") || rules[? "neyle_birlesecek"] != hedef_ad)) {
+            show_debug_message("[FAIL] Kural eşleşmedi → " + itm_id + " + " + hedef_ad);
+            scr_show_message("?", true);
+            global.inv_selected = -1;
+            return;
+        }
+
+        // === Eşleşme bulundu ===
+        var itm_destroyed = false;
+
+        if (rules[?"A_kaybolacak_mi"] == "yes") {
+            scr_inv_remove(itm_id);
+            itm_destroyed = true;
+        }
+
+        if (rules[?"B_kaybolacak_mi"] == "yes") {
+            with (all) if (string_lower(object_get_name(object_index)) == hedef_ad) instance_destroy();
+
+            if (rules[?"B_yerine"] != "") {
+                var repl = rules[?"B_yerine"];
+                instance_create_layer(x, y, layer, asset_get_index(repl));
+            }
+        }
+
+        // === Ses efekti ===
+        var snd_fx = rules[?"ne_ses_cikaracak"];
+        if (snd_fx != "") audio_play_sound(asset_get_index(snd_fx), 1, false);
+
+        // === Karakter voice (çoklu dil) ===
+        var voi_key = rules[?"ne_mesaj_verecek"];
+        if (voi_key != "" && ds_map_exists(global.lang_voi, voi_key)) {
+            var vdata = global.lang_voi[? voi_key];
+            var snd = vdata[? "file"];
+            if (snd != "") audio_play_sound(asset_get_index(snd), 1, false);
+        }
+
+        // === Mesaj (itm_en.ini’den) ===
+        var msg_key = rules[?"ne_mesaj_verecek"];
+        if (msg_key != "") {
+            var txt = "?";
+            if (ds_map_exists(global.lang_itm, msg_key)) {
+                var msg_entry = global.lang_itm[? msg_key];
+                if (is_string(msg_entry)) txt = msg_entry;
+                else if (ds_map_exists(msg_entry, "name")) txt = msg_entry[? "name"];
+            }
+            scr_show_message(txt);
+        }
+
+        // === Flag ayarı ===
+        if (rules[?"flag"] != "") global.flags[? rules[?"flag"]] = true;
+
+        // === Room değiştir ===
+        if (rules[?"room"] != "") room_goto(asset_get_index(rules[?"room"]));
+
+        // === Pickup sprite (isteğe bağlı) ===
+        if (rules[?"pickup_sprite"] != "") {
+            var spr_pick = asset_get_index(rules[?"pickup_sprite"]);
+            if (sprite_exists(spr_pick)) {
+                obj_player.sprite_index = spr_pick;
+                obj_player.image_index = 0;
+                obj_player.image_speed = 1;
+            }
+        }
+
+        if (!itm_destroyed) global.inv_selected = -1;
+        return;
+    }
+
+    // ===========================================================
+    // === TANIMSIZ OBJE (obstacle vb.) ==========================
+    // ===========================================================
+    show_debug_message("[FAIL] Bu obje interaktif değil: " + nm);
+    scr_show_message("?", true);
+    global.inv_selected = -1;
+
+    // Reset
+    global.pending_objname = "";
+    global.pending_spr     = -1;
+    global.pending_use     = noone;
+    global.pending_done    = false;
+}

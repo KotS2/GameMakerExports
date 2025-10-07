@@ -1,0 +1,480 @@
+/// Object : obj_MainMenu | Draw_64
+
+
+
+
+// --- dil metni güvenli alıcı (local helper) ---
+var lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    return (ds_exists(mm, ds_type_map) && ds_map_exists(mm, key)) ? string(mm[? key]) : def;
+};
+
+var gw = display_get_gui_width();
+var gh = display_get_gui_height();
+
+// ---------------- BG ----------------
+for (var row = 0; row < gh; row += 4) {
+    var t = row / gh;
+    var c = merge_color(make_color_rgb(15,22,32), make_color_rgb(60,70,88), t);
+    draw_rectangle_colour(0, row, gw, row + 4, c, c, c, c, false);
+}
+draw_set_alpha(0.08);
+for (var k = 0; k < 8; k++) {
+    var off = k * 140 + sin(bg_t * 0.6 + k) * 90;
+    draw_circle(gw * 0.5 + off, gh * 0.36 + cos(bg_t * 0.8 + k) * 22, 240 + k * 8, false);
+}
+draw_set_alpha(1);
+
+// ---------------- Root şeritleri ----------------
+draw_set_font(fnt);
+draw_set_halign(fa_center);
+draw_set_valign(fa_middle);
+
+for (var i = 0; i < array_length(items); i++) {
+    var it = items[i];
+
+    var y1 = first_y - slide * slide_px + i * (bar_h + gap);
+    var y2 = y1 + bar_h;
+
+    var expand = it.hover * 6;
+    y1 -= expand * 0.5;
+    y2 += expand * 0.5;
+
+    var clr = merge_color(pal_base[i], pal_hi[i], it.hover * 0.85);
+    var a = 1;
+    if (!it.enabled) { clr = col_disabled; a = 0.55; }
+
+    draw_set_alpha(a);
+    draw_rectangle_colour(x1, y1, x2, y2, clr, clr, clr, clr, false);
+    draw_set_alpha(1);
+
+    draw_set_alpha(0.08 + 0.12 * it.hover);
+    draw_rectangle_colour(x1, y1, x2, y1 + 3, c_white, c_white, c_white, c_white, false);
+    draw_set_alpha(0.06);
+    draw_rectangle_colour(x1, y2 - 3, x2, y2, c_black, c_black, c_black, c_black, false);
+    draw_set_alpha(1);
+
+    if (it.hover > 0.01 && it.enabled && state == "root") {
+        var sheen_w = container_w * 0.28;
+        var sx = lerp(x1 - sheen_w, x2, it.sheen);
+        draw_set_alpha(0.16 * it.hover);
+        draw_rectangle_colour(sx, y1, sx + sheen_w, y2, c_white, c_white, c_white, c_white, false);
+        draw_set_alpha(1);
+    }
+
+    var tx = (x1 + x2) * 0.5;
+    var ty = (y1 + y2) * 0.5;
+    if (it.enabled) {
+        draw_set_alpha(0.40); draw_text(tx + 2, ty + 2, it.label);
+        draw_set_alpha(1);    draw_text(tx, ty, it.label);
+    } else {
+        draw_set_alpha(0.35); draw_text(tx, ty, it.label); draw_set_alpha(1);
+    }
+
+    if (i == sel && state == "root") {
+        draw_set_alpha(0.85);
+        draw_set_color(c_white);
+        draw_rectangle(x1 + 2, y1 + 2, x2 - 2, y2 - 2, true);
+        draw_set_alpha(1);
+    }
+}
+
+// ---------------- ALT MENÜ: LOAD ----------------
+if (state == "load") {
+    var panel_x1 = x1 + 16;
+    var panel_x2 = x2 - 16;
+
+    var panel_y1 = first_y - slide * slide_px + (open_index + 1) * (bar_h + gap) + 6;
+    panel_y1 -= load_scroll; // SCROLL
+    var panel_y2 = panel_y1 + (global.save_slots * 56) + 18 + footer_h;
+
+    // panel gövdesi
+    draw_set_alpha(0.5);
+    draw_rectangle_colour(panel_x1, panel_y1, panel_x2, panel_y2,
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38),
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38), false);
+    draw_set_alpha(1);
+
+    // slotlar
+    var xL = x1 + 24;
+    var xR = x2 - 24;
+    var y_top = panel_y1 + 8;
+
+    for (var s = 0; s < global.save_slots; s++) {
+        var sy1 = y_top + s * 56;
+        var sy2 = sy1 + 48;
+        var filled = !is_undefined(global.save_data[s]);
+        var label  = filled ? (string(global.lang_menu[? "Slot_Filled"]) + " " + string(s+1))
+                            : (string(global.lang_menu[? "Slot_Empty"])  + " " + string(s+1));
+        var row_col = filled ? make_color_rgb(52,62,78) : make_color_rgb(38,44,55);
+
+        draw_set_alpha(0.85);
+        draw_rectangle_colour(xL, sy1, xR, sy2, row_col, row_col, row_col, row_col, false);
+        draw_set_alpha(1);
+
+        draw_set_alpha(filled ? 1 : 0.7);
+        draw_text((xL+xR)*0.5, (sy1+sy2)*0.5, label);
+        draw_set_alpha(1);
+    }
+
+    // footer (panel içeriğinin parçası)
+    var footer_y1 = panel_y2 - footer_h;
+    draw_set_alpha(0.35);
+    draw_rectangle_colour(panel_x1, footer_y1, panel_x2, panel_y2,
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30),
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30), false);
+    draw_set_alpha(0.6);
+    var back_txt1 = lang_get("Back_Hint", "ESC / Right Click: Back");
+    draw_text((panel_x1+panel_x2)*0.5, footer_y1 + footer_h*0.5, back_txt1);
+    draw_set_alpha(1);
+}
+
+// ---------------- ALT MENÜ: OPTIONS ----------------
+else if (state == "options") {
+    var m = global.lang_menu;
+
+    var panel_x1 = x1 + 16;
+    var panel_x2 = x2 - 16;
+
+    var panel_y1 = first_y - slide * slide_px + (open_index + 1) * (bar_h + gap) + 6;
+    panel_y1 -= opt_scroll; // SCROLL
+    var panel_y2 = panel_y1 + 8*42 + 36 + footer_h;
+
+    // panel gövdesi
+    draw_set_alpha(0.5);
+    draw_rectangle_colour(panel_x1, panel_y1, panel_x2, panel_y2,
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38),
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38), false);
+    draw_set_alpha(1);
+
+    // layout
+    var y0 = panel_y1 + 18;
+    var row_h = 42;
+    var label_x = panel_x1 + 20;
+    var bar_x1 = panel_x1 + 220;
+    var bar_x2 = panel_x2 - 20;
+
+    // --- 4 slider: music/voice/sfx/amb ---
+    var vals = [global.opt_music, global.opt_voi, global.opt_sfx, global.opt_amb];
+    var keys = ["Music_Volume","Voice_Volume","SFX_Volume","Amb_Volume"];
+
+    for (var r = 0; r < 4; r++) {
+        var yy = y0 + r*row_h;
+
+        draw_set_alpha(0.9);
+        draw_text(label_x, yy+14, m[? keys[r]]);
+        draw_set_alpha(1);
+
+        // bar
+        draw_set_alpha(0.4);
+        draw_rectangle_colour(bar_x1, yy, bar_x2, yy+28,
+            make_color_rgb(44,49,58), make_color_rgb(44,49,58),
+            make_color_rgb(44,49,58), make_color_rgb(44,49,58), false);
+        draw_set_alpha(1);
+
+        // fill
+        var t = clamp(vals[r], 0, 1);
+        var fx = lerp(bar_x1, bar_x2, t);
+        draw_set_alpha(0.85);
+        draw_rectangle_colour(bar_x1, yy, fx, yy+28,
+            make_color_rgb(112,180,220), make_color_rgb(112,180,220),
+            make_color_rgb(112,180,220), make_color_rgb(112,180,220), false);
+        draw_set_alpha(1);
+
+        // knob
+        draw_circle(fx, yy+14, 8, false);
+    }
+
+    // --- Fullscreen checkbox (kutu içinde kutu) ---
+    var fs_y = y0 + 4*row_h;
+    draw_text(label_x, fs_y+14, m[? "Fullscreen"]);
+    var fs_x1 = bar_x1;
+    var fs_y1 = fs_y;
+    var fs_w  = 28;
+    var fs_h  = 28;
+    draw_rectangle(fs_x1, fs_y1, fs_x1+fs_w, fs_y1+fs_h, false);
+    if (global.opt_fullscreen) {
+        var pad = 5;
+        draw_rectangle(fs_x1+pad, fs_y1+pad, fs_x1+fs_w-pad, fs_y1+fs_h-pad, false);
+    }
+
+    // --- Çözünürlük + ok hover highlight ---
+    var res_y = y0 + 5*row_h + 14;
+    var idx = clamp(global.opt_res_index, 0, array_length(global.res_list)-1);
+    var rr  = global.res_list[idx];
+
+    draw_text(label_x, res_y, m[? "Resolution"]);
+    draw_text((bar_x1+bar_x2)*0.5, res_y, string(rr[0]) + "x" + string(rr[1]));
+    if (hover_res_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    res_y-14, bar_x1+24, res_y+14, false); draw_set_alpha(1); }
+    if (hover_res_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, res_y-14, bar_x2,    res_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, res_y, "<");
+    draw_text(bar_x2, res_y, ">");
+
+    // --- Subtitle Lang ---
+    var sub_y = y0 + 6*row_h + 14;
+    draw_text(label_x, sub_y, m[? "Subtitle_Lang"]);
+    draw_text((bar_x1+bar_x2)*0.5, sub_y, string(global.opt_sub_lang));
+    if (hover_sub_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    sub_y-14, bar_x1+24, sub_y+14, false); draw_set_alpha(1); }
+    if (hover_sub_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, sub_y-14, bar_x2,    sub_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, sub_y, "<");
+    draw_text(bar_x2, sub_y, ">");
+
+    // --- Voice Lang ---
+    var voi_y = y0 + 7*row_h + 14;
+    draw_text(label_x, voi_y, m[? "Voice_Lang"]);
+    draw_text((bar_x1+bar_x2)*0.5, voi_y, string(global.opt_voi_lang));
+    if (hover_voi_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    voi_y-14, bar_x1+24, voi_y+14, false); draw_set_alpha(1); }
+    if (hover_voi_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, voi_y-14, bar_x2,    voi_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, voi_y, "<");
+    draw_text(bar_x2, voi_y, ">");
+
+    // footer
+    var footer_y1 = panel_y2 - footer_h;
+    draw_set_alpha(0.35);
+    draw_rectangle_colour(panel_x1, footer_y1, panel_x2, panel_y2,
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30),
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30), false);
+    draw_set_alpha(0.6);
+    var back_txt2 = lang_get("Back_Hint", "ESC / Right Click: Back");
+    draw_text((panel_x1+panel_x2)*0.5, footer_y1 + footer_h*0.5, back_txt2);
+    draw_set_alpha(1);
+}
+"
+/// obj_MainMenu.Draw GUI
+
+// --- dil metni güvenli alıcı (local helper) ---
+var lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    return (ds_exists(mm, ds_type_map) && ds_map_exists(mm, key)) ? string(mm[? key]) : def;
+};
+
+var gw = display_get_gui_width();
+var gh = display_get_gui_height();
+
+// ---------------- BG ----------------
+for (var row = 0; row < gh; row += 4) {
+    var t = row / gh;
+    var c = merge_color(make_color_rgb(15,22,32), make_color_rgb(60,70,88), t);
+    draw_rectangle_colour(0, row, gw, row + 4, c, c, c, c, false);
+}
+draw_set_alpha(0.08);
+for (var k = 0; k < 8; k++) {
+    var off = k * 140 + sin(bg_t * 0.6 + k) * 90;
+    draw_circle(gw * 0.5 + off, gh * 0.36 + cos(bg_t * 0.8 + k) * 22, 240 + k * 8, false);
+}
+draw_set_alpha(1);
+
+// ---------------- Root şeritleri ----------------
+draw_set_font(fnt);
+draw_set_halign(fa_center);
+draw_set_valign(fa_middle);
+
+for (var i = 0; i < array_length(items); i++) {
+    var it = items[i];
+
+    var y1 = first_y - slide * slide_px + i * (bar_h + gap);
+    var y2 = y1 + bar_h;
+
+    var expand = it.hover * 6;
+    y1 -= expand * 0.5;
+    y2 += expand * 0.5;
+
+    var clr = merge_color(pal_base[i], pal_hi[i], it.hover * 0.85);
+    var a = 1;
+    if (!it.enabled) { clr = col_disabled; a = 0.55; }
+
+    draw_set_alpha(a);
+    draw_rectangle_colour(x1, y1, x2, y2, clr, clr, clr, clr, false);
+    draw_set_alpha(1);
+
+    draw_set_alpha(0.08 + 0.12 * it.hover);
+    draw_rectangle_colour(x1, y1, x2, y1 + 3, c_white, c_white, c_white, c_white, false);
+    draw_set_alpha(0.06);
+    draw_rectangle_colour(x1, y2 - 3, x2, y2, c_black, c_black, c_black, c_black, false);
+    draw_set_alpha(1);
+
+    if (it.hover > 0.01 && it.enabled && state == "root") {
+        var sheen_w = container_w * 0.28;
+        var sx = lerp(x1 - sheen_w, x2, it.sheen);
+        draw_set_alpha(0.16 * it.hover);
+        draw_rectangle_colour(sx, y1, sx + sheen_w, y2, c_white, c_white, c_white, c_white, false);
+        draw_set_alpha(1);
+    }
+
+    var tx = (x1 + x2) * 0.5;
+    var ty = (y1 + y2) * 0.5;
+    if (it.enabled) {
+        draw_set_alpha(0.40); draw_text(tx + 2, ty + 2, it.label);
+        draw_set_alpha(1);    draw_text(tx, ty, it.label);
+    } else {
+        draw_set_alpha(0.35); draw_text(tx, ty, it.label); draw_set_alpha(1);
+    }
+
+    if (i == sel && state == "root") {
+        draw_set_alpha(0.85);
+        draw_set_color(c_white);
+        draw_rectangle(x1 + 2, y1 + 2, x2 - 2, y2 - 2, true);
+        draw_set_alpha(1);
+    }
+}
+
+// ---------------- ALT MENÜ: LOAD ----------------
+if (state == "load") {
+    var panel_x1 = x1 + 16;
+    var panel_x2 = x2 - 16;
+
+    var panel_y1 = first_y - slide * slide_px + (open_index + 1) * (bar_h + gap) + 6;
+    panel_y1 -= load_scroll; // SCROLL
+    var panel_y2 = panel_y1 + (global.save_slots * 56) + 18 + footer_h;
+
+    // panel gövdesi
+    draw_set_alpha(0.5);
+    draw_rectangle_colour(panel_x1, panel_y1, panel_x2, panel_y2,
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38),
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38), false);
+    draw_set_alpha(1);
+
+    // slotlar
+    var xL = x1 + 24;
+    var xR = x2 - 24;
+    var y_top = panel_y1 + 8;
+
+    for (var s = 0; s < global.save_slots; s++) {
+        var sy1 = y_top + s * 56;
+        var sy2 = sy1 + 48;
+        var filled = !is_undefined(global.save_data[s]);
+        var label  = filled ? (string(global.lang_menu[? "Slot_Filled"]) + " " + string(s+1))
+                            : (string(global.lang_menu[? "Slot_Empty"])  + " " + string(s+1));
+        var row_col = filled ? make_color_rgb(52,62,78) : make_color_rgb(38,44,55);
+
+        draw_set_alpha(0.85);
+        draw_rectangle_colour(xL, sy1, xR, sy2, row_col, row_col, row_col, row_col, false);
+        draw_set_alpha(1);
+
+        draw_set_alpha(filled ? 1 : 0.7);
+        draw_text((xL+xR)*0.5, (sy1+sy2)*0.5, label);
+        draw_set_alpha(1);
+    }
+
+    // footer (panel içeriğinin parçası)
+    var footer_y1 = panel_y2 - footer_h;
+    draw_set_alpha(0.35);
+    draw_rectangle_colour(panel_x1, footer_y1, panel_x2, panel_y2,
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30),
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30), false);
+    draw_set_alpha(0.6);
+    var back_txt1 = lang_get("Back_Hint", "ESC / Right Click: Back");
+    draw_text((panel_x1+panel_x2)*0.5, footer_y1 + footer_h*0.5, back_txt1);
+    draw_set_alpha(1);
+}
+
+// ---------------- ALT MENÜ: OPTIONS ----------------
+else if (state == "options") {
+    var m = global.lang_menu;
+
+    var panel_x1 = x1 + 16;
+    var panel_x2 = x2 - 16;
+
+    var panel_y1 = first_y - slide * slide_px + (open_index + 1) * (bar_h + gap) + 6;
+    panel_y1 -= opt_scroll; // SCROLL
+    var panel_y2 = panel_y1 + 8*42 + 36 + footer_h;
+
+    // panel gövdesi
+    draw_set_alpha(0.5);
+    draw_rectangle_colour(panel_x1, panel_y1, panel_x2, panel_y2,
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38),
+        make_color_rgb(25,30,38), make_color_rgb(25,30,38), false);
+    draw_set_alpha(1);
+
+    // layout
+    var y0 = panel_y1 + 18;
+    var row_h = 42;
+    var label_x = panel_x1 + 20;
+    var bar_x1 = panel_x1 + 220;
+    var bar_x2 = panel_x2 - 20;
+
+    // --- 4 slider: music/voice/sfx/amb ---
+    var vals = [global.opt_music, global.opt_voi, global.opt_sfx, global.opt_amb];
+    var keys = ["Music_Volume","Voice_Volume","SFX_Volume","Amb_Volume"];
+
+    for (var r = 0; r < 4; r++) {
+        var yy = y0 + r*row_h;
+
+        draw_set_alpha(0.9);
+        draw_text(label_x, yy+14, m[? keys[r]]);
+        draw_set_alpha(1);
+
+        // bar
+        draw_set_alpha(0.4);
+        draw_rectangle_colour(bar_x1, yy, bar_x2, yy+28,
+            make_color_rgb(44,49,58), make_color_rgb(44,49,58),
+            make_color_rgb(44,49,58), make_color_rgb(44,49,58), false);
+        draw_set_alpha(1);
+
+        // fill
+        var t = clamp(vals[r], 0, 1);
+        var fx = lerp(bar_x1, bar_x2, t);
+        draw_set_alpha(0.85);
+        draw_rectangle_colour(bar_x1, yy, fx, yy+28,
+            make_color_rgb(112,180,220), make_color_rgb(112,180,220),
+            make_color_rgb(112,180,220), make_color_rgb(112,180,220), false);
+        draw_set_alpha(1);
+
+        // knob
+        draw_circle(fx, yy+14, 8, false);
+    }
+
+    // --- Fullscreen checkbox (kutu içinde kutu) ---
+    var fs_y = y0 + 4*row_h;
+    draw_text(label_x, fs_y+14, m[? "Fullscreen"]);
+    var fs_x1 = bar_x1;
+    var fs_y1 = fs_y;
+    var fs_w  = 28;
+    var fs_h  = 28;
+    draw_rectangle(fs_x1, fs_y1, fs_x1+fs_w, fs_y1+fs_h, false);
+    if (global.opt_fullscreen) {
+        var pad = 5;
+        draw_rectangle(fs_x1+pad, fs_y1+pad, fs_x1+fs_w-pad, fs_y1+fs_h-pad, false);
+    }
+
+    // --- Çözünürlük + ok hover highlight ---
+    var res_y = y0 + 5*row_h + 14;
+    var idx = clamp(global.opt_res_index, 0, array_length(global.res_list)-1);
+    var rr  = global.res_list[idx];
+
+    draw_text(label_x, res_y, m[? "Resolution"]);
+    draw_text((bar_x1+bar_x2)*0.5, res_y, string(rr[0]) + "x" + string(rr[1]));
+    if (hover_res_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    res_y-14, bar_x1+24, res_y+14, false); draw_set_alpha(1); }
+    if (hover_res_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, res_y-14, bar_x2,    res_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, res_y, "<");
+    draw_text(bar_x2, res_y, ">");
+
+    // --- Subtitle Lang ---
+    var sub_y = y0 + 6*row_h + 14;
+    draw_text(label_x, sub_y, m[? "Subtitle_Lang"]);
+    draw_text((bar_x1+bar_x2)*0.5, sub_y, string(global.opt_sub_lang));
+    if (hover_sub_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    sub_y-14, bar_x1+24, sub_y+14, false); draw_set_alpha(1); }
+    if (hover_sub_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, sub_y-14, bar_x2,    sub_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, sub_y, "<");
+    draw_text(bar_x2, sub_y, ">");
+
+    // --- Voice Lang ---
+    var voi_y = y0 + 7*row_h + 14;
+    draw_text(label_x, voi_y, m[? "Voice_Lang"]);
+    draw_text((bar_x1+bar_x2)*0.5, voi_y, string(global.opt_voi_lang));
+    if (hover_voi_left)  { draw_set_alpha(0.25); draw_rectangle(bar_x1,    voi_y-14, bar_x1+24, voi_y+14, false); draw_set_alpha(1); }
+    if (hover_voi_right) { draw_set_alpha(0.25); draw_rectangle(bar_x2-24, voi_y-14, bar_x2,    voi_y+14, false); draw_set_alpha(1); }
+    draw_text(bar_x1, voi_y, "<");
+    draw_text(bar_x2, voi_y, ">");
+
+    // footer
+    var footer_y1 = panel_y2 - footer_h;
+    draw_set_alpha(0.35);
+    draw_rectangle_colour(panel_x1, footer_y1, panel_x2, panel_y2,
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30),
+        make_color_rgb(20,24,30), make_color_rgb(20,24,30), false);
+    draw_set_alpha(0.6);
+    var back_txt2 = lang_get("Back_Hint", "ESC / Right Click: Back");
+    draw_text((panel_x1+panel_x2)*0.5, footer_y1 + footer_h*0.5, back_txt2);
+    draw_set_alpha(1);
+}

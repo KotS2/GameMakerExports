@@ -1,0 +1,13 @@
+/// Object : obj_UISuppressor | Destroy_0
+
+
+
+
+global.cursor_suppressed      = prev_supp;
+global.ui_interaction_enabled = prev_inter;
+window_set_cursor(cr_none); // sonraki odada da OS görünmesin
+"
+/// obj_UISuppressor.Destroy
+global.cursor_suppressed      = prev_supp;
+global.ui_interaction_enabled = prev_inter;
+window_set_cursor(cr_none); // sonraki odada da OS görünmesin

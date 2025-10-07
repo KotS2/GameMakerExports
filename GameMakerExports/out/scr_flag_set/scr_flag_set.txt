@@ -1,0 +1,5 @@
+/// Script : scr_flag_set
+//scr_flag_set
+var f = argument0;
+if (!variable_global_exists("flags")) global.flags = ds_map_create();
+global.flags[? f] = true;

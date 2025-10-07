@@ -1,0 +1,67 @@
+/// Object : obj_game_controller | Create_0
+
+
+
+
+if (instance_number(object_index) > 1) { instance_destroy(); exit; }
+persistent = true;
+
+pause_active = false;
+
+// Pause görsel cache yüzeyleri
+pause_src  = -1; // full capture
+pause_blur = -1; // küçültülmüş (bulanık)
+
+// Pause’tan güvenli çıkış (arka planı uyandır + yüzeyleri temizle)
+pause_off = function() {
+    instance_activate_all();
+    if (surface_exists(pause_src))  { surface_free(pause_src);  pause_src  = -1; }
+    if (surface_exists(pause_blur)) { surface_free(pause_blur); pause_blur = -1; }
+    pause_active = false;
+};
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    if (is_undefined(mm) || !ds_exists(mm, ds_type_map)) return def;
+    return ds_map_exists(mm, key) ? string(mm[? key]) : def;
+};
+// --- Locale helper ---
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    if (is_undefined(mm) || !ds_exists(mm, ds_type_map)) return def;
+    return ds_map_exists(mm, key) ? string(mm[? key]) : def;
+};
+
+// --- Font guard ---
+menu_font = (variable_global_exists("font_menu")) ? global.font_menu : -1;
+"
+/// obj_game_controller.Create
+if (instance_number(object_index) > 1) { instance_destroy(); exit; }
+persistent = true;
+
+pause_active = false;
+
+// Pause görsel cache yüzeyleri
+pause_src  = -1; // full capture
+pause_blur = -1; // küçültülmüş (bulanık)
+
+// Pause’tan güvenli çıkış (arka planı uyandır + yüzeyleri temizle)
+pause_off = function() {
+    instance_activate_all();
+    if (surface_exists(pause_src))  { surface_free(pause_src);  pause_src  = -1; }
+    if (surface_exists(pause_blur)) { surface_free(pause_blur); pause_blur = -1; }
+    pause_active = false;
+};
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    if (is_undefined(mm) || !ds_exists(mm, ds_type_map)) return def;
+    return ds_map_exists(mm, key) ? string(mm[? key]) : def;
+};
+// --- Locale helper ---
+lang_get = function(key, def) {
+    var mm = global.lang_menu;
+    if (is_undefined(mm) || !ds_exists(mm, ds_type_map)) return def;
+    return ds_map_exists(mm, key) ? string(mm[? key]) : def;
+};
+
+// --- Font guard ---
+menu_font = (variable_global_exists("font_menu")) ? global.font_menu : -1;

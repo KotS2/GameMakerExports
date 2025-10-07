@@ -1,0 +1,498 @@
+/// Object : obj_player | Create_0
+
+
+
+
+/// obj_player - Create
+nearest = [noone, noone];
+dists   = [999999, 999999];
+pickup_delay = 0;
+head_offset = 192; // px cinsinden kafa yüksekliği
+
+mask_index = spr_player_mask_1px;
+
+prev_x = x;
+prev_y = y;
+
+// --- GEÇİŞ KİLİDİ (FRAME TABANLI) ---
+TRANS_LOCK_FRAMES = 20;   // transition’dan çıkınca bekle
+trans_lock_timer  = 0;
+
+// Hangi sprite'lar TRANSITION? (set)
+is_transition_sprite = function(s) {
+    return (s == spr_soldan_saga) || (s == spr_soldan_arkaya) || (s == spr_soldan_karsiya) ||
+           (s == spr_sagdan_sola) || (s == spr_sagdan_arkaya) || (s == spr_sagdan_karsiya) ||
+           (s == spr_arkadan_sola)|| (s == spr_arkadan_saga)  || (s == spr_arkadan_one)     ||
+           (s == spr_karsidan_sola)|| (s == spr_karsidan_saga)|| (s == spr_karsidan_arkaya);
+};
+
+// --- KİLİT BAŞLAT (TRANSITION) ---
+trans_lock_start = function() {
+    trans_lock_timer = TRANS_LOCK_FRAMES;
+};
+
+// --- TABAN HIZLAR ---
+player_base_px_s_x = 420;   // yatay hız tabanı
+player_base_px_s_y = 220;   // dikey hız tabanı
+
+// --- PATHFINDING STATE ---
+my_points = [];
+my_index  = -1;
+target_px  = 0;
+target_py  = 0;
+has_target = false;
+
+// --- ANİMASYON DURUMU ---
+facing          = "down";  // "left","right","up","down"
+target_facing   = "down";
+last_move_angle = 0;
+
+// --- SPRITE YARDIMCILARI ---
+get_walk = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol;
+        case "right": return spr_sag;
+        case "up":    return spr_ark;
+        case "down":  return spr_on;
+    }
+    return spr_on;
+};
+get_idle = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol_idle;
+        case "right": return spr_sag_idle;
+        case "up":    return spr_ark_idle;
+        case "down":  return spr_on_idle;
+    }
+    return spr_on_idle;
+};
+get_dur = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol_dur;
+        case "right": return spr_sag_dur;
+        case "up":    return spr_ark_dur;
+        case "down":  return spr_on_dur;
+    }
+    return get_idle(dir);
+};
+
+// --- GÖRSEL / ÇİZİM ---
+t_disp            = 0;   // çizimde yumuşatma için
+start_dist_px     = 1;
+depth_scale_active = false;
+
+// Başlangıç sprite'ı
+sprite_index = get_idle(facing);
+image_index  = 0;
+image_speed  = 1;
+
+// --- IDLE / DUR geçişi takip ---
+last_was_idle_or_dur = false;
+
+// ===============================
+// INTERACTION STATE
+// ===============================
+interact_pending        = false; // kuyrukta iş var mı?
+interact_type           = "";    // "take" | "use"
+interact_stance         = "";    // "stand" | "crouch"
+interact_target         = noone; // hedef instance
+interact_prev_idle      = -1;    // anim bitince dönülecek idle
+interact_reach_required = false; // hedefe varmak gerekiyor mu
+interact_lock_timer     = 0;     
+INTERACT_LOCK_FRAMES    = 30;    // pick animasyonu boyunca kilit
+
+// --- IDLE tespiti ---
+is_idle_sprite = function(s) {
+    return (s == spr_sol_idle) || (s == spr_sag_idle) ||
+           (s == spr_ark_idle) || (s == spr_on_idle);
+};
+
+// --- DUR tespiti ---
+is_dur_sprite = function(s) {
+    return (s == spr_sol_dur) || (s == spr_sag_dur) ||
+           (s == spr_ark_dur) || (s == spr_on_dur);
+};
+
+// --- IDLE veya DUR tespiti ---
+is_idle_or_dur_sprite = function(s) {
+    return is_idle_sprite(s) || is_dur_sprite(s);
+};
+
+// --- PICK/KULLAN anim tespiti ---
+is_pick_sprite = function(s) {
+    return (s == spr_arkadan_ayakta) || (s == spr_arkadan_yerden) ||
+           (s == spr_karsidan_ayakta) || (s == spr_karsidan_yerden) ||
+           (s == spr_sagdan_ayakta) || (s == spr_sagdan_yerden) ||
+           (s == spr_soldan_ayakta) || (s == spr_soldan_yerden);
+};
+
+// --- Yön → pick sprite ---
+get_pick_sprite = function(dir, stance) {
+    var stand = (stance == "stand");
+    switch (dir) {
+        case "up":    return stand ? spr_arkadan_ayakta   : spr_arkadan_yerden;
+        case "down":  return stand ? spr_karsidan_ayakta  : spr_karsidan_yerden;
+        case "right": return stand ? spr_sagdan_ayakta    : spr_sagdan_yerden;
+        case "left":  return stand ? spr_soldan_ayakta    : spr_soldan_yerden;
+    }
+    return stand ? spr_karsidan_ayakta : spr_karsidan_yerden;
+};
+
+// --- Sprite → facing ---
+sprite_to_dir = function(s) {
+    if (s == spr_sol || s == spr_sol_idle || s == spr_sol_dur)   return "left";
+    if (s == spr_sag || s == spr_sag_idle || s == spr_sag_dur)   return "right";
+    if (s == spr_ark || s == spr_ark_idle || s == spr_ark_dur)   return "up";
+    return "down"; // varsayılan
+};
+
+// --- İsimden aksiyon + duruş çöz ---
+resolve_action_from_name = function(_inst, _inv_item_name) {
+    var nm = string_lower(object_get_name(_inst.object_index));
+
+    // Use objeleri
+    if (string_pos("usea", nm) > 0) return ["use", "stand"];
+    if (string_pos("usey", nm) > 0) return ["use", "crouch"];
+
+    // Take objeleri
+    if (string_pos("tkna", nm) > 0) return ["take", "stand"];
+    if (string_pos("tkny", nm) > 0) return ["take", "crouch"];
+
+    return ["", ""];
+};
+
+// --- Interaction kuyruğa al ---
+queue_interaction = function(target_inst, inv_item_name, _need_reach) {
+    if (!instance_exists(target_inst)) return false;
+
+    var pair = resolve_action_from_name(target_inst, inv_item_name);
+    var a = pair[0], st = pair[1];
+    if (a == "" || st == "") return false;
+
+    interact_pending        = true;
+    interact_type           = a;       // "take" | "use"
+    interact_stance         = st;      // "stand" | "crouch"
+    interact_target         = target_inst;
+    interact_reach_required = _need_reach;
+
+    // BURASI ÖNEMLİ: pending fallback her zaman set edilmeli
+    global.pending_objname = object_get_name(target_inst.object_index);
+    global.pending_spr     = target_inst.sprite_index;
+
+    show_debug_message("[INTERACT] queued: " + a + " / " + st +
+        " on " + global.pending_objname +
+        " need_reach=" + string(_need_reach));
+    return true;
+};
+
+// --- Interaction BAŞLAT ---
+start_interaction_if_possible = function() {
+    if (!interact_pending) return;
+
+    // Idle veya Dur pozisyonunda olmalı
+    if (!is_idle_or_dur_sprite(sprite_index)) return;
+
+    // Eğer varış şartı varsa, yolun bitmiş olması lazım
+    if (interact_reach_required && has_target) return;
+
+    var dir_now  = sprite_to_dir(sprite_index);
+    var spr_pick = get_pick_sprite(dir_now, interact_stance);
+
+    // Idle/Dur’u hatırla → dönüş için
+    interact_prev_idle = is_idle_sprite(sprite_index)
+        ? sprite_index
+        : get_idle(dir_now); // eğer dur’daysa, dönüş idle olacak
+
+    // Anim başlat
+    if (sprite_exists(spr_pick)) {
+        sprite_index = spr_pick;
+        image_index  = 0;
+        image_speed  = 1;
+
+        interact_lock_timer = INTERACT_LOCK_FRAMES;
+        interact_pending    = false;
+
+        show_debug_message("[INTERACT] started: " + interact_type + " / " + interact_stance);
+    }
+};
+
+// --- Interaction BİTİR ---
+finish_interaction = function() {
+    if (interact_prev_idle != -1) {
+        sprite_index = interact_prev_idle;
+    } else {
+        sprite_index = get_idle(sprite_to_dir(sprite_index));
+    }
+    image_index = 0;
+    image_speed = 1;
+
+    interact_prev_idle  = -1;
+    interact_target     = noone;
+    interact_type       = "";
+    interact_stance     = "";
+    interact_lock_timer = 0;
+
+    show_debug_message("[INTERACT] finished.");
+};
+
+// --- Interaction İPTAL ---
+cancel_interaction = function() {
+    if (is_pick_sprite(sprite_index)) return false; // oynuyorken iptal etme
+    interact_pending = false;
+    interact_target  = noone;
+    interact_type    = "";
+    interact_stance  = "";
+    return true;
+};
+// Interaction için varsayılanlar
+global.pending_use  = noone;
+global.pending_done = false;
+global.pending_objname = "";
+global.pending_spr     = -1;"
+
+/// obj_player - Create
+nearest = [noone, noone];
+dists   = [999999, 999999];
+pickup_delay = 0;
+head_offset = 192; // px cinsinden kafa yüksekliği
+
+mask_index = spr_player_mask_1px;
+
+prev_x = x;
+prev_y = y;
+
+// --- GEÇİŞ KİLİDİ (FRAME TABANLI) ---
+TRANS_LOCK_FRAMES = 20;   // transition’dan çıkınca bekle
+trans_lock_timer  = 0;
+
+// Hangi sprite'lar TRANSITION? (set)
+is_transition_sprite = function(s) {
+    return (s == spr_soldan_saga) || (s == spr_soldan_arkaya) || (s == spr_soldan_karsiya) ||
+           (s == spr_sagdan_sola) || (s == spr_sagdan_arkaya) || (s == spr_sagdan_karsiya) ||
+           (s == spr_arkadan_sola)|| (s == spr_arkadan_saga)  || (s == spr_arkadan_one)     ||
+           (s == spr_karsidan_sola)|| (s == spr_karsidan_saga)|| (s == spr_karsidan_arkaya);
+};
+
+// --- KİLİT BAŞLAT (TRANSITION) ---
+trans_lock_start = function() {
+    trans_lock_timer = TRANS_LOCK_FRAMES;
+};
+
+// --- TABAN HIZLAR ---
+player_base_px_s_x = 420;   // yatay hız tabanı
+player_base_px_s_y = 220;   // dikey hız tabanı
+
+// --- PATHFINDING STATE ---
+my_points = [];
+my_index  = -1;
+target_px  = 0;
+target_py  = 0;
+has_target = false;
+
+// --- ANİMASYON DURUMU ---
+facing          = "down";  // "left","right","up","down"
+target_facing   = "down";
+last_move_angle = 0;
+
+// --- SPRITE YARDIMCILARI ---
+get_walk = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol;
+        case "right": return spr_sag;
+        case "up":    return spr_ark;
+        case "down":  return spr_on;
+    }
+    return spr_on;
+};
+get_idle = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol_idle;
+        case "right": return spr_sag_idle;
+        case "up":    return spr_ark_idle;
+        case "down":  return spr_on_idle;
+    }
+    return spr_on_idle;
+};
+get_dur = function(dir) {
+    switch (dir) {
+        case "left":  return spr_sol_dur;
+        case "right": return spr_sag_dur;
+        case "up":    return spr_ark_dur;
+        case "down":  return spr_on_dur;
+    }
+    return get_idle(dir);
+};
+
+// --- GÖRSEL / ÇİZİM ---
+t_disp            = 0;   // çizimde yumuşatma için
+start_dist_px     = 1;
+depth_scale_active = false;
+
+// Başlangıç sprite'ı
+sprite_index = get_idle(facing);
+image_index  = 0;
+image_speed  = 1;
+
+// --- IDLE / DUR geçişi takip ---
+last_was_idle_or_dur = false;
+
+// ===============================
+// INTERACTION STATE
+// ===============================
+interact_pending        = false; // kuyrukta iş var mı?
+interact_type           = "";    // "take" | "use"
+interact_stance         = "";    // "stand" | "crouch"
+interact_target         = noone; // hedef instance
+interact_prev_idle      = -1;    // anim bitince dönülecek idle
+interact_reach_required = false; // hedefe varmak gerekiyor mu
+interact_lock_timer     = 0;     
+INTERACT_LOCK_FRAMES    = 30;    // pick animasyonu boyunca kilit
+
+// --- IDLE tespiti ---
+is_idle_sprite = function(s) {
+    return (s == spr_sol_idle) || (s == spr_sag_idle) ||
+           (s == spr_ark_idle) || (s == spr_on_idle);
+};
+
+// --- DUR tespiti ---
+is_dur_sprite = function(s) {
+    return (s == spr_sol_dur) || (s == spr_sag_dur) ||
+           (s == spr_ark_dur) || (s == spr_on_dur);
+};
+
+// --- IDLE veya DUR tespiti ---
+is_idle_or_dur_sprite = function(s) {
+    return is_idle_sprite(s) || is_dur_sprite(s);
+};
+
+// --- PICK/KULLAN anim tespiti ---
+is_pick_sprite = function(s) {
+    return (s == spr_arkadan_ayakta) || (s == spr_arkadan_yerden) ||
+           (s == spr_karsidan_ayakta) || (s == spr_karsidan_yerden) ||
+           (s == spr_sagdan_ayakta) || (s == spr_sagdan_yerden) ||
+           (s == spr_soldan_ayakta) || (s == spr_soldan_yerden);
+};
+
+// --- Yön → pick sprite ---
+get_pick_sprite = function(dir, stance) {
+    var stand = (stance == "stand");
+    switch (dir) {
+        case "up":    return stand ? spr_arkadan_ayakta   : spr_arkadan_yerden;
+        case "down":  return stand ? spr_karsidan_ayakta  : spr_karsidan_yerden;
+        case "right": return stand ? spr_sagdan_ayakta    : spr_sagdan_yerden;
+        case "left":  return stand ? spr_soldan_ayakta    : spr_soldan_yerden;
+    }
+    return stand ? spr_karsidan_ayakta : spr_karsidan_yerden;
+};
+
+// --- Sprite → facing ---
+sprite_to_dir = function(s) {
+    if (s == spr_sol || s == spr_sol_idle || s == spr_sol_dur)   return "left";
+    if (s == spr_sag || s == spr_sag_idle || s == spr_sag_dur)   return "right";
+    if (s == spr_ark || s == spr_ark_idle || s == spr_ark_dur)   return "up";
+    return "down"; // varsayılan
+};
+
+// --- İsimden aksiyon + duruş çöz ---
+resolve_action_from_name = function(_inst, _inv_item_name) {
+    var nm = string_lower(object_get_name(_inst.object_index));
+
+    // Use objeleri
+    if (string_pos("usea", nm) > 0) return ["use", "stand"];
+    if (string_pos("usey", nm) > 0) return ["use", "crouch"];
+
+    // Take objeleri
+    if (string_pos("tkna", nm) > 0) return ["take", "stand"];
+    if (string_pos("tkny", nm) > 0) return ["take", "crouch"];
+
+    return ["", ""];
+};
+
+// --- Interaction kuyruğa al ---
+queue_interaction = function(target_inst, inv_item_name, _need_reach) {
+    if (!instance_exists(target_inst)) return false;
+
+    var pair = resolve_action_from_name(target_inst, inv_item_name);
+    var a = pair[0], st = pair[1];
+    if (a == "" || st == "") return false;
+
+    interact_pending        = true;
+    interact_type           = a;       // "take" | "use"
+    interact_stance         = st;      // "stand" | "crouch"
+    interact_target         = target_inst;
+    interact_reach_required = _need_reach;
+
+    // BURASI ÖNEMLİ: pending fallback her zaman set edilmeli
+    global.pending_objname = object_get_name(target_inst.object_index);
+    global.pending_spr     = target_inst.sprite_index;
+
+    show_debug_message("[INTERACT] queued: " + a + " / " + st +
+        " on " + global.pending_objname +
+        " need_reach=" + string(_need_reach));
+    return true;
+};
+
+// --- Interaction BAŞLAT ---
+start_interaction_if_possible = function() {
+    if (!interact_pending) return;
+
+    // Idle veya Dur pozisyonunda olmalı
+    if (!is_idle_or_dur_sprite(sprite_index)) return;
+
+    // Eğer varış şartı varsa, yolun bitmiş olması lazım
+    if (interact_reach_required && has_target) return;
+
+    var dir_now  = sprite_to_dir(sprite_index);
+    var spr_pick = get_pick_sprite(dir_now, interact_stance);
+
+    // Idle/Dur’u hatırla → dönüş için
+    interact_prev_idle = is_idle_sprite(sprite_index)
+        ? sprite_index
+        : get_idle(dir_now); // eğer dur’daysa, dönüş idle olacak
+
+    // Anim başlat
+    if (sprite_exists(spr_pick)) {
+        sprite_index = spr_pick;
+        image_index  = 0;
+        image_speed  = 1;
+
+        interact_lock_timer = INTERACT_LOCK_FRAMES;
+        interact_pending    = false;
+
+        show_debug_message("[INTERACT] started: " + interact_type + " / " + interact_stance);
+    }
+};
+
+// --- Interaction BİTİR ---
+finish_interaction = function() {
+    if (interact_prev_idle != -1) {
+        sprite_index = interact_prev_idle;
+    } else {
+        sprite_index = get_idle(sprite_to_dir(sprite_index));
+    }
+    image_index = 0;
+    image_speed = 1;
+
+    interact_prev_idle  = -1;
+    interact_target     = noone;
+    interact_type       = "";
+    interact_stance     = "";
+    interact_lock_timer = 0;
+
+    show_debug_message("[INTERACT] finished.");
+};
+
+// --- Interaction İPTAL ---
+cancel_interaction = function() {
+    if (is_pick_sprite(sprite_index)) return false; // oynuyorken iptal etme
+    interact_pending = false;
+    interact_target  = noone;
+    interact_type    = "";
+    interact_stance  = "";
+    return true;
+};
+// Interaction için varsayılanlar
+global.pending_use  = noone;
+global.pending_done = false;
+global.pending_objname = "";
+global.pending_spr     = -1;

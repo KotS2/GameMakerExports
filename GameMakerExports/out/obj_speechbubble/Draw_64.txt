@@ -1,0 +1,63 @@
+/// Object : obj_speechbubble | Draw_64
+
+
+
+
+draw_set_halign(fa_center);
+draw_set_valign(fa_bottom);
+
+// gölge
+draw_set_color(c_black);
+draw_text(x+2, y+2, bubble_msg);
+
+// ana yazı
+draw_set_color(c_white);
+draw_text(x, y, bubble_msg);
+if (instance_exists(parent_id)) {
+    // Karakterin sprite boyutunu al
+    var spr = parent_id.sprite_index;
+    if (!sprite_exists(spr)) spr = spr_on_idle;
+    var spr_h = max(1, sprite_get_height(spr));
+
+    // Karakterin perspektif scale hesapla
+    var t = clamp((parent_id.y - global.horizon_y) / global.visible_height, 0, 1);
+    var bottom_target_ratio = 0.12;
+    var target_px_h = bottom_target_ratio * global.visible_height;
+    var max_scale   = (target_px_h / spr_h) * (variable_global_exists("char_height") ? global.char_height : 1.0);
+    var min_scale   = max_scale * 0.25;
+    var scale       = lerp(min_scale, max_scale, t);
+
+    // Balon konumunu güncelle → scale ile çarpılmış offset
+    x = parent_id.x;
+    y = parent_id.y - (spr_h * scale * 0.8); // 0.8 → kafa hizası için ayarlanabilir
+}
+"
+// obj_speechbubble Draw GUI
+draw_set_halign(fa_center);
+draw_set_valign(fa_bottom);
+
+// gölge
+draw_set_color(c_black);
+draw_text(x+2, y+2, bubble_msg);
+
+// ana yazı
+draw_set_color(c_white);
+draw_text(x, y, bubble_msg);
+if (instance_exists(parent_id)) {
+    // Karakterin sprite boyutunu al
+    var spr = parent_id.sprite_index;
+    if (!sprite_exists(spr)) spr = spr_on_idle;
+    var spr_h = max(1, sprite_get_height(spr));
+
+    // Karakterin perspektif scale hesapla
+    var t = clamp((parent_id.y - global.horizon_y) / global.visible_height, 0, 1);
+    var bottom_target_ratio = 0.12;
+    var target_px_h = bottom_target_ratio * global.visible_height;
+    var max_scale   = (target_px_h / spr_h) * (variable_global_exists("char_height") ? global.char_height : 1.0);
+    var min_scale   = max_scale * 0.25;
+    var scale       = lerp(min_scale, max_scale, t);
+
+    // Balon konumunu güncelle → scale ile çarpılmış offset
+    x = parent_id.x;
+    y = parent_id.y - (spr_h * scale * 0.8); // 0.8 → kafa hizası için ayarlanabilir
+}

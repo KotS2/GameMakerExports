@@ -1,0 +1,23 @@
+/// Object : obj_UICursor | Create_0
+
+
+
+
+if (instance_number(obj_UICursor) > 1) { instance_destroy(); exit; }
+
+// Varsayılan: en üste
+depth = variable_global_exists("CURSOR_DEPTH_TOP")
+      ? global.CURSOR_DEPTH_TOP
+      : 10000000;
+
+mx = 0; my = 0;
+"
+/// obj_UICursor.Create
+if (instance_number(obj_UICursor) > 1) { instance_destroy(); exit; }
+
+// Varsayılan: en üste
+depth = variable_global_exists("CURSOR_DEPTH_TOP")
+      ? global.CURSOR_DEPTH_TOP
+      : 10000000;
+
+mx = 0; my = 0;

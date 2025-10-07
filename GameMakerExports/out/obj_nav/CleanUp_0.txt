@@ -1,0 +1,17 @@
+/// Object : obj_nav | CleanUp_0
+
+
+
+
+if (path != -1) path_delete(path);
+if (grid != undefined) {
+    mp_grid_destroy(grid);
+    grid = undefined;
+}
+"
+/// obj_nav - Clean Up
+if (path != -1) path_delete(path);
+if (grid != undefined) {
+    mp_grid_destroy(grid);
+    grid = undefined;
+}

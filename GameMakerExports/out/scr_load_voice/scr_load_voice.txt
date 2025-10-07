@@ -1,0 +1,27 @@
+/// Script : scr_load_voice
+/// scr_load_voice(lang)
+function scr_load_voice(_lang) {
+    var fname = "voi_" + _lang + ".ini";
+
+    if (!variable_global_exists("locale_voice")) {
+        global.locale_voice = ds_map_create();
+    }
+    ds_map_clear(global.locale_voice);
+
+    if (file_exists(fname)) {
+        ini_open(fname);
+        var sect = ini_section_first();
+        while (sect != "") {
+            var data = ds_map_create();
+            data[? "file"]   = ini_read_string(sect, "file", "");
+            data[? "actor"]  = ini_read_string(sect, "actor", "");
+            data[? "volume"] = ini_read_real(sect, "volume", 1.0);
+            global.locale_voice[? sect] = data;
+            sect = ini_section_next();
+        }
+        ini_close();
+        show_debug_message("[VOICE] Loaded: " + fname);
+    } else {
+        show_debug_message("[VOICE] Missing ini: " + fname);
+    }
+}

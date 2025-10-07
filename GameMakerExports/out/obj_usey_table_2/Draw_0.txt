@@ -1,0 +1,141 @@
+/// Object : obj_usey_table_2 | Draw_0
+
+
+
+
+// Sprite bilgileri
+var spr = sprite_index;
+if (!sprite_exists(spr)) exit;
+var img = image_index mod max(1, sprite_get_number(spr));
+
+// --- En yakın 2 ışığı bul ---
+dists[0]   = 999999;
+dists[1]   = 999999;
+nearest[0] = noone;
+nearest[1] = noone;
+
+with (obj_light) {
+    var d = point_distance(other.x, other.y, x, y);
+    if (d < other.dists[0]) {
+        other.dists[1] = other.dists[0];
+        other.nearest[1] = other.nearest[0];
+        other.dists[0] = d;
+        other.nearest[0] = id;
+    }
+    else if (id != other.nearest[0] && d < other.dists[1]) {
+        other.dists[1] = d;
+        other.nearest[1] = id;
+    }
+}
+
+// --- Scale (sabit, perspektif yok) ---
+var scale = 2.0;
+
+// --- 2 ışık için gölge çiz (Player sistemi) ---
+for (var i = 0; i < 2; i++) {
+    var L = nearest[i];
+    if (L != noone) { // ışık varsa çiz
+        // 🔑 Player kodundaki AYNI sistem
+        var dir_light  = point_direction(x, y, L.x, L.y);
+        var dir_shadow = (dir_light + 90) mod 360;
+        
+        // 🔑 Flip: scale_x cos(angle) ile
+        var shadow_scale_x = cos(degtorad(dir_shadow)) * scale;
+        var shadow_scale_y = 1.5 * scale; // player'daki gibi
+        
+        // 🔑 Sabit opacity (player'daki gibi)
+        var shadow_alpha = 0.35;
+        
+        // --- Gölge çiz (player'daki gibi) ---
+        draw_sprite_ext(
+            spr, img,
+            x,                    // x pozisyonu
+            y,              // y + 20 (zemine bastır)
+            shadow_scale_x,      // cos() ile flip
+            shadow_scale_y,      // uzatılmış y
+            dir_shadow,          // döndürülmüş
+            c_black,             // siyah gölge (debug için c_red yapabilirsiniz)
+            shadow_alpha         // şeffaflık
+        );
+        
+        // --- Debug (player'daki gibi) ---
+        draw_set_color(i == 0 ? c_lime : c_aqua);
+        draw_line(L.x, L.y, x, y);
+        draw_text(x + 40, y - 20 - i * 15,
+            "Light " + string(i+1) +
+            " dir=" + string(round(dir_shadow)) + "°" +
+            " cos=" + string_format(shadow_scale_x,1,2));
+    }
+}
+
+// --- Objeyi çiz ---
+draw_self();"
+/// Sabit obje gölge çizimi (Player kodunun aynısı, perspektifsiz)
+
+// Sprite bilgileri
+var spr = sprite_index;
+if (!sprite_exists(spr)) exit;
+var img = image_index mod max(1, sprite_get_number(spr));
+
+// --- En yakın 2 ışığı bul ---
+dists[0]   = 999999;
+dists[1]   = 999999;
+nearest[0] = noone;
+nearest[1] = noone;
+
+with (obj_light) {
+    var d = point_distance(other.x, other.y, x, y);
+    if (d < other.dists[0]) {
+        other.dists[1] = other.dists[0];
+        other.nearest[1] = other.nearest[0];
+        other.dists[0] = d;
+        other.nearest[0] = id;
+    }
+    else if (id != other.nearest[0] && d < other.dists[1]) {
+        other.dists[1] = d;
+        other.nearest[1] = id;
+    }
+}
+
+// --- Scale (sabit, perspektif yok) ---
+var scale = 2.0;
+
+// --- 2 ışık için gölge çiz (Player sistemi) ---
+for (var i = 0; i < 2; i++) {
+    var L = nearest[i];
+    if (L != noone) { // ışık varsa çiz
+        // 🔑 Player kodundaki AYNI sistem
+        var dir_light  = point_direction(x, y, L.x, L.y);
+        var dir_shadow = (dir_light + 90) mod 360;
+        
+        // 🔑 Flip: scale_x cos(angle) ile
+        var shadow_scale_x = cos(degtorad(dir_shadow)) * scale;
+        var shadow_scale_y = 1.5 * scale; // player'daki gibi
+        
+        // 🔑 Sabit opacity (player'daki gibi)
+        var shadow_alpha = 0.35;
+        
+        // --- Gölge çiz (player'daki gibi) ---
+        draw_sprite_ext(
+            spr, img,
+            x,                    // x pozisyonu
+            y,              // y + 20 (zemine bastır)
+            shadow_scale_x,      // cos() ile flip
+            shadow_scale_y,      // uzatılmış y
+            dir_shadow,          // döndürülmüş
+            c_black,             // siyah gölge (debug için c_red yapabilirsiniz)
+            shadow_alpha         // şeffaflık
+        );
+        
+        // --- Debug (player'daki gibi) ---
+        draw_set_color(i == 0 ? c_lime : c_aqua);
+        draw_line(L.x, L.y, x, y);
+        draw_text(x + 40, y - 20 - i * 15,
+            "Light " + string(i+1) +
+            " dir=" + string(round(dir_shadow)) + "°" +
+            " cos=" + string_format(shadow_scale_x,1,2));
+    }
+}
+
+// --- Objeyi çiz ---
+draw_self();

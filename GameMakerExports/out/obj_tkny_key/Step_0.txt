@@ -1,0 +1,46 @@
+/// Object : obj_tkny_key | Step_0
+
+
+
+
+// Anahtar sadece kapıya çalışır
+var rules = ds_map_create();
+rules[?"neyle_birleşecek"] = "obj_usea_door";
+rules[?"flag_gerekli"]     = "";
+rules[?"A_kaybolacak_mi"]  = "no";
+rules[?"A_yerine"]         = "";
+rules[?"B_kaybolacak_mi"]  = "yes";
+rules[?"B_yerine"]         = "obj_usea_dooropen";
+rules[?"ne_ses_cikaracak"] = "snd_cing";
+rules[?"ne_mesaj_verecek"] = "msg_key_opened";
+rules[?"animasyon"]        = "";
+rules[?"room"]             = "";
+rules[?"flag"]             = "door_opened";
+
+// global item kurallarına kaydet
+if (!variable_global_exists("item_rules")) {
+    global.item_rules = ds_map_create();
+}
+global.item_rules[? "itm_key"] = rules;
+"
+// obj_tkny_key - User Event 0
+
+// Anahtar sadece kapıya çalışır
+var rules = ds_map_create();
+rules[?"neyle_birleşecek"] = "obj_usea_door";
+rules[?"flag_gerekli"]     = "";
+rules[?"A_kaybolacak_mi"]  = "no";
+rules[?"A_yerine"]         = "";
+rules[?"B_kaybolacak_mi"]  = "yes";
+rules[?"B_yerine"]         = "obj_usea_dooropen";
+rules[?"ne_ses_cikaracak"] = "snd_cing";
+rules[?"ne_mesaj_verecek"] = "msg_key_opened";
+rules[?"animasyon"]        = "";
+rules[?"room"]             = "";
+rules[?"flag"]             = "door_opened";
+
+// global item kurallarına kaydet
+if (!variable_global_exists("item_rules")) {
+    global.item_rules = ds_map_create();
+}
+global.item_rules[? "itm_key"] = rules;

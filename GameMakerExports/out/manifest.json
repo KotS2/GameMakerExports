@@ -1,0 +1,132 @@
+{
+  "project": "grid based",
+  "generatedAt": "2025-10-07T14:58:19.329Z",
+  "objects": {
+    "obj_Boot": [
+      "Create_0.txt"
+    ],
+    "obj_game_controller": [
+      "Create_0.txt",
+      "Draw_64.txt",
+      "Other_4.txt",
+      "Step_0.txt"
+    ],
+    "obj_inventory_controller": [
+      "Create_0.txt",
+      "Draw_64.txt",
+      "Step_0.txt"
+    ],
+    "obj_light": [
+      "Create_0.txt"
+    ],
+    "obj_light2": [],
+    "obj_light_001": [
+      "Create_0.txt"
+    ],
+    "obj_light_002": [
+      "Create_0.txt"
+    ],
+    "obj_loader": [
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ],
+    "obj_MainMenu": [
+      "Create_0.txt",
+      "Draw_64.txt",
+      "Mouse_4.txt",
+      "Mouse_60.txt",
+      "Mouse_61.txt",
+      "Step_0.txt"
+    ],
+    "obj_nav": [
+      "CleanUp_0.txt",
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ],
+    "obj_obstacle": [],
+    "obj_player": [
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ],
+    "obj_speechbubble": [
+      "Create_0.txt",
+      "Draw_64.txt",
+      "Step_0.txt"
+    ],
+    "obj_table": [
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ],
+    "obj_tkna_bucket": [],
+    "obj_tkny_key": [
+      "Step_0.txt"
+    ],
+    "obj_UICursor": [
+      "Create_0.txt",
+      "Draw_75.txt",
+      "Step_0.txt"
+    ],
+    "obj_UISuppressor": [
+      "Create_0.txt",
+      "Destroy_0.txt"
+    ],
+    "obj_usea_table_1": [
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ],
+    "obj_usey_table_2": [
+      "Create_0.txt",
+      "Draw_0.txt",
+      "Step_0.txt"
+    ]
+  },
+  "scripts": {
+    "scr_flag_check": [
+      "scr_flag_check.txt"
+    ],
+    "scr_flag_set": [
+      "scr_flag_set.txt"
+    ],
+    "scr_get_item_id": [
+      "scr_get_item_id.txt"
+    ],
+    "scr_inv_add": [
+      "scr_inv_add.txt"
+    ],
+    "scr_inv_draw": [
+      "scr_inv_draw.txt"
+    ],
+    "scr_inv_remove": [
+      "scr_inv_remove.txt"
+    ],
+    "scr_load_items": [
+      "scr_load_items.txt"
+    ],
+    "scr_load_locale": [
+      "scr_load_locale.txt"
+    ],
+    "scr_load_voice": [
+      "scr_load_voice.txt"
+    ],
+    "scr_player_finish_interaction": [
+      "scr_player_finish_interaction.txt"
+    ],
+    "scr_save_options": [
+      "scr_save_options.txt"
+    ],
+    "scr_show_failmsg": [
+      "scr_show_failmsg.txt"
+    ],
+    "scr_show_message": [
+      "scr_show_message.txt"
+    ],
+    "scr_sprite_name_safe": [
+      "scr_sprite_name_safe.txt"
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+/// Script : scr_load_items
+/// scr_load_items(lang)
+function scr_load_items(_lang) {
+    var fname = _lang + "_itm.ini";
+    if (!file_exists(fname)) {
+        show_debug_message("[ITEM] Missing: " + fname);
+        return;
+    }
+
+    if (!variable_global_exists("item_rules")) global.item_rules = ds_map_create();
+    ds_map_clear(global.item_rules);
+
+    ini_open(fname);
+    var sect = ini_section_first();
+
+    while (sect != "") {
+        // --- Temel bilgiler ---
+        var item_map = ds_map_create();
+        item_map[? "name"] = ini_read_string(sect, "name", "?");
+        item_map[? "desc"] = ini_read_string(sect, "desc", "?");
+
+        // --- Combo tarama ---
+        var combos = [];
+        var idx = 1;
+
+        while (true) {
+            var key_target = "combo" + string(idx) + "_target";
+            if (!ini_key_exists(sect, key_target)) break;
+
+            var combo = {
+                target: ini_read_string(sect, key_target, ""),
+                result: ini_read_string(sect, "combo" + string(idx) + "_result", ""),
+                sound:  ini_read_string(sect, "combo" + string(idx) + "_sound", ""),
+                voice_eng: ini_read_string(sect, "combo" + string(idx) + "_voice_eng", ""),
+                voice_tur: ini_read_string(sect, "combo" + string(idx) + "_voice_tur", ""),
+                msg: ini_read_string(sect, "combo" + string(idx) + "_msg", ""),
+                flag: ini_read_string(sect, "combo" + string(idx) + "_flag", ""),
+                A_kaybolacak_mi: ini_read_string(sect, "combo" + string(idx) + "_A_kaybolacak_mi", "no"),
+                B_kaybolacak_mi: ini_read_string(sect, "combo" + string(idx) + "_B_kaybolacak_mi", "no"),
+                pickup_sprite: ini_read_string(sect, "combo" + string(idx) + "_pickup_sprite", "")
+            };
+            array_push(combos, combo);
+            idx++;
+        }
+
+        item_map[? "combos"] = combos;
+        global.item_rules[? sect] = item_map;
+
+        sect = ini_section_next();
+    }
+
+    ini_close();
+    show_debug_message("[ITEM] Loaded combos: " + string(ds_map_size(global.item_rules)));
+}

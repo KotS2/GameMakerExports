@@ -1,0 +1,16 @@
+/// Script : scr_get_item_id
+/// scr_get_item_id(objname)
+// örn: "obj_tkna_bucket" → "itm_bucket"
+//      "obj_tkny_rope"   → "itm_rope"
+//      "obj_use_door"    → "" (envantere girmez)
+
+var nm = string_lower(argument0);
+
+if (string_copy(nm, 1, 9) == "obj_tkna_") {
+    return "itm_" + string_delete(nm, 1, 9);
+
+} else if (string_copy(nm, 1, 9) == "obj_tkny_") {
+    return "itm_" + string_delete(nm, 1, 9);
+}
+
+return "";

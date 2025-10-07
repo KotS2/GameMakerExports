@@ -1,0 +1,15 @@
+/// Script : scr_inv_remove
+/// scr_inv_remove(itm_id)
+if (!variable_global_exists("inventory")) exit;
+
+var itm_id = argument0;
+
+for (var i = 0; i < ds_list_size(global.inventory); i++) {
+    var entry = global.inventory[| i];
+    if (is_array(entry) && entry[0] == itm_id) {
+        ds_list_delete(global.inventory, i);
+        if (global.inv_selected == i) global.inv_selected = -1;
+        show_debug_message("[INV] removed " + itm_id);
+        exit;
+    }
+}

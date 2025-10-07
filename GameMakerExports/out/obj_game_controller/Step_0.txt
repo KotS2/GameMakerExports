@@ -1,0 +1,111 @@
+/// Object : obj_game_controller | Step_0
+
+
+
+
+if (global.room_is_gameplay) {
+    if (keyboard_check_pressed(vk_escape)) {
+        pause_active = !pause_active;
+
+        if (pause_active) {
+            // --- PAUSE AÇILIYOR ---
+            // GMS1.x: notme=true; GMS2'de de sorun çıkarmaz (GMS2'de argümansızdır ama sende argüman bekliyor)
+            instance_deactivate_all(true); // <— ÖNEMLİ: Hata buydu
+
+            // İstersen cursor’u özellikle aktif tut:
+            if (asset_get_index("obj_UICursor") != -1) instance_activate_object(obj_UICursor);
+
+            // Yakala & blur cache (SHADER YOK)
+            if (surface_exists(pause_src))  surface_free(pause_src);
+            if (surface_exists(pause_blur)) surface_free(pause_blur);
+
+            if (surface_exists(application_surface)) {
+                var sw = surface_get_width(application_surface);
+                var sh = surface_get_height(application_surface);
+
+                // full kopya
+                pause_src = surface_create(sw, sh);
+                surface_set_target(pause_src);
+                draw_clear_alpha(c_black, 0);
+                draw_surface(application_surface, 0, 0);
+                surface_reset_target();
+
+                // küçük yüzeye indir → blur etkisi
+                var dw = max(1, sw div 6);
+                var dh = max(1, sh div 6);
+                pause_blur = surface_create(dw, dh);
+                surface_set_target(pause_blur);
+                draw_clear_alpha(c_black, 0);
+                draw_surface_stretched(pause_src, 0, 0, dw, dh);
+                surface_reset_target();
+            } else {
+                pause_src = -1;
+                pause_blur = -1;
+            }
+        } else {
+            // --- PAUSE KAPANIYOR ---
+            pause_off();
+        }
+    }
+} else {
+    // Gameplay olmayan odalarda emniyet
+    if (pause_active) {
+        pause_active = false;
+    }
+    if (surface_exists(pause_src))  { surface_free(pause_src);  pause_src  = -1; }
+    if (surface_exists(pause_blur)) { surface_free(pause_blur); pause_blur = -1; }
+}
+"
+/// obj_game_controller.Step
+if (global.room_is_gameplay) {
+    if (keyboard_check_pressed(vk_escape)) {
+        pause_active = !pause_active;
+
+        if (pause_active) {
+            // --- PAUSE AÇILIYOR ---
+            // GMS1.x: notme=true; GMS2'de de sorun çıkarmaz (GMS2'de argümansızdır ama sende argüman bekliyor)
+            instance_deactivate_all(true); // <— ÖNEMLİ: Hata buydu
+
+            // İstersen cursor’u özellikle aktif tut:
+            if (asset_get_index("obj_UICursor") != -1) instance_activate_object(obj_UICursor);
+
+            // Yakala & blur cache (SHADER YOK)
+            if (surface_exists(pause_src))  surface_free(pause_src);
+            if (surface_exists(pause_blur)) surface_free(pause_blur);
+
+            if (surface_exists(application_surface)) {
+                var sw = surface_get_width(application_surface);
+                var sh = surface_get_height(application_surface);
+
+                // full kopya
+                pause_src = surface_create(sw, sh);
+                surface_set_target(pause_src);
+                draw_clear_alpha(c_black, 0);
+                draw_surface(application_surface, 0, 0);
+                surface_reset_target();
+
+                // küçük yüzeye indir → blur etkisi
+                var dw = max(1, sw div 6);
+                var dh = max(1, sh div 6);
+                pause_blur = surface_create(dw, dh);
+                surface_set_target(pause_blur);
+                draw_clear_alpha(c_black, 0);
+                draw_surface_stretched(pause_src, 0, 0, dw, dh);
+                surface_reset_target();
+            } else {
+                pause_src = -1;
+                pause_blur = -1;
+            }
+        } else {
+            // --- PAUSE KAPANIYOR ---
+            pause_off();
+        }
+    }
+} else {
+    // Gameplay olmayan odalarda emniyet
+    if (pause_active) {
+        pause_active = false;
+    }
+    if (surface_exists(pause_src))  { surface_free(pause_src);  pause_src  = -1; }
+    if (surface_exists(pause_blur)) { surface_free(pause_blur); pause_blur = -1; }
+}

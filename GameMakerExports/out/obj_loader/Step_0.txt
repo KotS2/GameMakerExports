@@ -1,0 +1,49 @@
+/// Object : obj_loader | Step_0
+
+
+
+
+if (progress < array_length(assets)) {
+    var spr_id = assets[progress];
+
+    // GPU belleğine yükle
+    sprite_prefetch(spr_id);
+
+    // Debug log
+    show_debug_message(
+        "Prefetched [" + string(progress+1) + "/" + string(array_length(assets)) + "] "
+        + "ID=" + string(spr_id)
+    );
+
+    progress += 1;
+}
+else {
+    // Yükleme tamamlandı
+	global.scr_cursor_set_depth(global.CURSOR_DEPTH_TOP);
+    show_debug_message("All sprites loaded!");
+    room_goto_next(); // sonraki odaya geç
+	
+}
+"
+/// obj_loader - Step
+if (progress < array_length(assets)) {
+    var spr_id = assets[progress];
+
+    // GPU belleğine yükle
+    sprite_prefetch(spr_id);
+
+    // Debug log
+    show_debug_message(
+        "Prefetched [" + string(progress+1) + "/" + string(array_length(assets)) + "] "
+        + "ID=" + string(spr_id)
+    );
+
+    progress += 1;
+}
+else {
+    // Yükleme tamamlandı
+	global.scr_cursor_set_depth(global.CURSOR_DEPTH_TOP);
+    show_debug_message("All sprites loaded!");
+    room_goto_next(); // sonraki odaya geç
+	
+}

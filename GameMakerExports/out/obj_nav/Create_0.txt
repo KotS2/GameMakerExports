@@ -1,0 +1,300 @@
+/// Object : obj_nav | Create_0
+
+
+
+
+if (!variable_global_exists("selected_item_name")) {
+    global.selected_item_name = "";
+}
+
+// === GRID & AYARLAR ===
+cell       = 14;
+allow_diag = true;
+
+// Halka (fallback) — hedefe göre yönlü yarım daire
+rings_max         = 25; //En fazla kaç halka (ring) denenir?
+ring_steps_base   = 3; //İlk halkanın üzerinde kaç yön/sıçrama noktası denensin?
+ring_steps_growth = 2; //Her yeni halkada ek olarak kaç yön daha denensin?
+ring_rad_factor   = 3; // fallback çemberlerinin aralığı (cell * factor)
+
+// Grid
+var gw = room_width  div cell;
+var gh = room_height div cell;
+grid = mp_grid_create(0, 0, gw, gh, cell, cell);
+
+nav_rebuild_grid = function() {
+    mp_grid_clear_all(grid);
+    with (obj_obstacle) {
+        mp_grid_add_rectangle(other.grid, bbox_left, bbox_top, bbox_right, bbox_bottom);
+    }
+};
+nav_rebuild_grid = function() {
+    mp_grid_clear_all(grid);
+    with (obj_obstacle) {
+        var spr = sprite_index;
+        
+        // Orijinal sprite bounding box (sprite editor’de tanımlanan)
+        var spr_left   = sprite_get_bbox_left(spr);
+        var spr_right  = sprite_get_bbox_right(spr);
+        var spr_top    = sprite_get_bbox_top(spr);
+        var spr_bottom = sprite_get_bbox_bottom(spr);
+
+        // Ölçeklenmiş gerçek koordinatlar
+        var left   = x + (spr_left   - sprite_xoffset) * image_xscale;
+        var right  = x + (spr_right  - sprite_xoffset) * image_xscale;
+        var top    = y + (spr_top    - sprite_yoffset) * image_yscale;
+        var bottom = y + (spr_bottom - sprite_yoffset) * image_yscale;
+
+        // Grid’e ekle
+        mp_grid_add_rectangle(other.grid, left, top, right, bottom);
+    }
+};
+
+// Path (okumak için; path_start KULLANMIYORUZ)
+path = path_add();
+
+// Hedef cache
+target_x = x;
+target_y = y;
+
+// === DEBUG (halkalar) ===
+dbg_show_rings      = true;
+dbg_animate         = true;
+dbg_anim_speed      = 2;
+dbg_point_rad       = 2;
+debug_trace         = []; // [ [px,py,ring], ... ]
+debug_anim_progress = 0;
+debug_hit_index     = -1;
+debug_center_x      = x;
+debug_center_y      = y;
+
+dbg_trace_clear = function() {
+    debug_trace = [];
+    debug_anim_progress = 0;
+    debug_hit_index = -1;
+};
+dbg_trace_add = function(_x, _y, _r) {
+    var n = array_length(debug_trace);
+    debug_trace[n] = [_x, _y, _r];
+};
+
+// === RAY (sadeleştirilmiş yol) ===
+nav_ray_full        = []; // start + tüm mp_grid noktaları (debug)
+nav_ray_simplified  = []; // start + sadeleştirilmiş + sanitize edilmiş ray
+nav_ray_send        = []; // Player’a gidecek (start HARİÇ)
+
+// === LOS yardımcıları ===
+ray_has_los = function(x1,y1,x2,y2) {
+    return !collision_line(x1, y1, x2, y2, obj_obstacle, true, true);
+};
+
+// Greedy LOS sadeleştirme
+ray_simplify_los = function(points_arr) {
+    var L = array_length(points_arr);
+    if (L <= 2) return points_arr;
+
+    var out = [];
+    array_push(out, points_arr[0]); // start
+
+    var i = 0;
+    while (i < L - 1) {
+        var far = i + 1;
+        var j = i + 1;
+        while (j < L && ray_has_los(points_arr[i][0], points_arr[i][1], points_arr[j][0], points_arr[j][1])) {
+            far = j;
+            j++;
+        }
+        array_push(out, points_arr[far]);
+        i = far;
+    }
+    return out;
+};
+
+// === Nokta sanitize (sadece ray üstünde) ===
+function nav_sanitize_target(_x, _y) {
+    // Eğer obstacle içindeyse → etrafına kaydır
+    if (collision_point(_x, _y, obj_obstacle, true, true)) {
+        var rr = cell;
+        while (rr <= cell * 3) {
+            for (var a = 0; a < 360; a += 45) {
+                var nx = _x + lengthdir_x(rr, a);
+                var ny = _y + lengthdir_y(rr, a);
+                if (!collision_point(nx, ny, obj_obstacle, true, true)) {
+                    return [nx, ny];
+                }
+            }
+            rr += cell;
+        }
+        return undefined; // çıkış bulamadı
+    }
+
+    // Çok yakında mı? → uzaklaştır
+    var clearance = cell;
+    if (collision_circle(_x, _y, clearance, obj_obstacle, true, true)) {
+        var rr2 = clearance;
+        while (rr2 <= cell * 3) {
+            for (var b = 0; b < 360; b += 45) {
+                var mx = _x + lengthdir_x(rr2, b);
+                var my = _y + lengthdir_y(rr2, b);
+                if (!collision_circle(mx, my, clearance, obj_obstacle, true, true)) {
+                    return [mx, my];
+                }
+            }
+            rr2 += cell;
+        }
+        return undefined;
+    }
+
+    return [_x, _y];
+}
+
+show_debug_message("[NAV] ready");
+"
+/// obj_nav - Create
+
+if (!variable_global_exists("selected_item_name")) {
+    global.selected_item_name = "";
+}
+
+// === GRID & AYARLAR ===
+cell       = 14;
+allow_diag = true;
+
+// Halka (fallback) — hedefe göre yönlü yarım daire
+rings_max         = 25; //En fazla kaç halka (ring) denenir?
+ring_steps_base   = 3; //İlk halkanın üzerinde kaç yön/sıçrama noktası denensin?
+ring_steps_growth = 2; //Her yeni halkada ek olarak kaç yön daha denensin?
+ring_rad_factor   = 3; // fallback çemberlerinin aralığı (cell * factor)
+
+// Grid
+var gw = room_width  div cell;
+var gh = room_height div cell;
+grid = mp_grid_create(0, 0, gw, gh, cell, cell);
+
+nav_rebuild_grid = function() {
+    mp_grid_clear_all(grid);
+    with (obj_obstacle) {
+        mp_grid_add_rectangle(other.grid, bbox_left, bbox_top, bbox_right, bbox_bottom);
+    }
+};
+nav_rebuild_grid = function() {
+    mp_grid_clear_all(grid);
+    with (obj_obstacle) {
+        var spr = sprite_index;
+        
+        // Orijinal sprite bounding box (sprite editor’de tanımlanan)
+        var spr_left   = sprite_get_bbox_left(spr);
+        var spr_right  = sprite_get_bbox_right(spr);
+        var spr_top    = sprite_get_bbox_top(spr);
+        var spr_bottom = sprite_get_bbox_bottom(spr);
+
+        // Ölçeklenmiş gerçek koordinatlar
+        var left   = x + (spr_left   - sprite_xoffset) * image_xscale;
+        var right  = x + (spr_right  - sprite_xoffset) * image_xscale;
+        var top    = y + (spr_top    - sprite_yoffset) * image_yscale;
+        var bottom = y + (spr_bottom - sprite_yoffset) * image_yscale;
+
+        // Grid’e ekle
+        mp_grid_add_rectangle(other.grid, left, top, right, bottom);
+    }
+};
+
+// Path (okumak için; path_start KULLANMIYORUZ)
+path = path_add();
+
+// Hedef cache
+target_x = x;
+target_y = y;
+
+// === DEBUG (halkalar) ===
+dbg_show_rings      = true;
+dbg_animate         = true;
+dbg_anim_speed      = 2;
+dbg_point_rad       = 2;
+debug_trace         = []; // [ [px,py,ring], ... ]
+debug_anim_progress = 0;
+debug_hit_index     = -1;
+debug_center_x      = x;
+debug_center_y      = y;
+
+dbg_trace_clear = function() {
+    debug_trace = [];
+    debug_anim_progress = 0;
+    debug_hit_index = -1;
+};
+dbg_trace_add = function(_x, _y, _r) {
+    var n = array_length(debug_trace);
+    debug_trace[n] = [_x, _y, _r];
+};
+
+// === RAY (sadeleştirilmiş yol) ===
+nav_ray_full        = []; // start + tüm mp_grid noktaları (debug)
+nav_ray_simplified  = []; // start + sadeleştirilmiş + sanitize edilmiş ray
+nav_ray_send        = []; // Player’a gidecek (start HARİÇ)
+
+// === LOS yardımcıları ===
+ray_has_los = function(x1,y1,x2,y2) {
+    return !collision_line(x1, y1, x2, y2, obj_obstacle, true, true);
+};
+
+// Greedy LOS sadeleştirme
+ray_simplify_los = function(points_arr) {
+    var L = array_length(points_arr);
+    if (L <= 2) return points_arr;
+
+    var out = [];
+    array_push(out, points_arr[0]); // start
+
+    var i = 0;
+    while (i < L - 1) {
+        var far = i + 1;
+        var j = i + 1;
+        while (j < L && ray_has_los(points_arr[i][0], points_arr[i][1], points_arr[j][0], points_arr[j][1])) {
+            far = j;
+            j++;
+        }
+        array_push(out, points_arr[far]);
+        i = far;
+    }
+    return out;
+};
+
+// === Nokta sanitize (sadece ray üstünde) ===
+function nav_sanitize_target(_x, _y) {
+    // Eğer obstacle içindeyse → etrafına kaydır
+    if (collision_point(_x, _y, obj_obstacle, true, true)) {
+        var rr = cell;
+        while (rr <= cell * 3) {
+            for (var a = 0; a < 360; a += 45) {
+                var nx = _x + lengthdir_x(rr, a);
+                var ny = _y + lengthdir_y(rr, a);
+                if (!collision_point(nx, ny, obj_obstacle, true, true)) {
+                    return [nx, ny];
+                }
+            }
+            rr += cell;
+        }
+        return undefined; // çıkış bulamadı
+    }
+
+    // Çok yakında mı? → uzaklaştır
+    var clearance = cell;
+    if (collision_circle(_x, _y, clearance, obj_obstacle, true, true)) {
+        var rr2 = clearance;
+        while (rr2 <= cell * 3) {
+            for (var b = 0; b < 360; b += 45) {
+                var mx = _x + lengthdir_x(rr2, b);
+                var my = _y + lengthdir_y(rr2, b);
+                if (!collision_circle(mx, my, clearance, obj_obstacle, true, true)) {
+                    return [mx, my];
+                }
+            }
+            rr2 += cell;
+        }
+        return undefined;
+    }
+
+    return [_x, _y];
+}
+
+show_debug_message("[NAV] ready");

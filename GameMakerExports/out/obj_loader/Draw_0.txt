@@ -1,0 +1,51 @@
+/// Object : obj_loader | Draw_0
+
+
+
+
+var total = array_length(assets);
+
+// Yükleme yüzdesi
+var percent = (progress / total);
+
+// Bar boyutları
+var bar_w = 400;
+var bar_h = 30;
+var bar_x = (display_get_width() - bar_w) / 2;
+var bar_y = (display_get_height() - bar_h) / 2;
+
+// Çerçeve
+draw_set_color(c_white);
+draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, false);
+
+// Dolum
+draw_set_color(c_lime);
+draw_rectangle(bar_x, bar_y, bar_x + bar_w * percent, bar_y + bar_h, false);
+
+// Yüzde yazısı
+draw_set_color(c_white);
+draw_text(bar_x, bar_y - 20, "Loading... " + string(floor(percent * 100)) + "%");
+"
+/// obj_loader - Draw
+var total = array_length(assets);
+
+// Yükleme yüzdesi
+var percent = (progress / total);
+
+// Bar boyutları
+var bar_w = 400;
+var bar_h = 30;
+var bar_x = (display_get_width() - bar_w) / 2;
+var bar_y = (display_get_height() - bar_h) / 2;
+
+// Çerçeve
+draw_set_color(c_white);
+draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, false);
+
+// Dolum
+draw_set_color(c_lime);
+draw_rectangle(bar_x, bar_y, bar_x + bar_w * percent, bar_y + bar_h, false);
+
+// Yüzde yazısı
+draw_set_color(c_white);
+draw_text(bar_x, bar_y - 20, "Loading... " + string(floor(percent * 100)) + "%");

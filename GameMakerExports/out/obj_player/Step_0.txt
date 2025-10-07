@@ -1,0 +1,872 @@
+/// Object : obj_player | Step_0
+
+
+
+
+depth = -y;
+
+// ======================================
+// 0) Varsayılanlar / kilit
+// ======================================
+var stepx = 0;
+var stepy = 0;
+var dir_pressed = "";
+
+if (trans_lock_timer > 0) trans_lock_timer--;
+
+var spr = sprite_index;
+
+// Idle/Dur check → hareketi kilitle
+var is_idle_or_dur =
+    (spr == spr_sol_idle) || (spr == spr_sag_idle) ||
+    (spr == spr_ark_idle) || (spr == spr_on_idle)  ||
+    (spr == spr_sol_dur)  || (spr == spr_sag_dur)  ||
+    (spr == spr_ark_dur)  || (spr == spr_on_dur);
+
+movement_locked = (trans_lock_timer > 0);
+movement_paused = movement_locked || is_idle_or_dur;
+
+// Eğer idle/dur’dan çıkıldıysa → tekrar başlat
+if (!is_idle_or_dur && last_was_idle_or_dur) {
+    if (!has_target) consume_waypoint();
+}
+last_was_idle_or_dur = is_idle_or_dur;
+
+// ======================================
+// Yardımcı: waypoint tüket
+// ======================================
+function consume_waypoint() {
+    var total = array_length(my_points);
+    if (my_index < total - 1) {
+        my_index++;
+        var pt = my_points[my_index];
+        
+        if (is_array(pt) && array_length(pt) >= 2) {
+            target_px  = pt[0];
+            target_py  = pt[1];
+            has_target = true;
+            show_debug_message("[PLAYER] New target → (" 
+                + string(target_px) + "," + string(target_py) 
+                + ") idx=" + string(my_index+1) + "/" + string(total));
+        } else {
+            show_debug_message("[ERR] consume_waypoint: pt array değil → " + string(pt));
+            has_target = false;
+        }
+    } else {
+        has_target = false;
+        show_debug_message("[PLAYER] Path finished.");
+    }
+}
+
+// hedefe ulaştı mı?
+if (path_position == 1 && global.pending_use != noone) {
+    if (!global.pending_done) {
+        scr_player_finish_interaction();
+        global.pending_done = true; // tekrar çalışmaz
+    }
+}
+
+// ======================================
+// 1) Hedef yoksa → yeni hedef
+// ======================================
+if (!has_target) {
+    consume_waypoint();
+
+    // Eğer ilk waypoint'teysek → otomatik atla
+    if (my_index == 0) {
+        show_debug_message("[DBG] first waypoint auto-consumed");
+        consume_waypoint();
+    }
+}
+
+// ======================================
+// 2) Hedefe varış/overshoot (yalnızca hareket serbestken)
+// ======================================
+if (has_target && !movement_paused) {
+    var dist = point_distance(x, y, target_px, target_py);
+
+    // (a) Varış
+    if (dist <= 8) {
+        consume_waypoint();
+    }
+    // (b) Overshoot
+    else if (my_index > 0 && dist > 16) {
+        var dir_now  = point_direction(x, y, target_px, target_py);
+        var dir_prev = point_direction(xprevious, yprevious, target_px, target_py);
+
+        if (abs(angle_difference(dir_now, dir_prev)) > 135) {
+            show_debug_message("[DBG] overshoot detected (idx=" + string(my_index) + ")");
+            consume_waypoint();
+        }
+    }
+}
+
+// ======================================
+// 3) Hız / step hesabı
+// ======================================
+if (has_target) {
+    var ang = point_direction(x, y, target_px, target_py);
+
+    var t = (variable_global_exists("horizon_y") && variable_global_exists("visible_height") && global.visible_height > 0)
+        ? clamp((y - global.horizon_y) / global.visible_height, 0, 1)
+        : 1.0;
+
+    var base_x = (variable_instance_exists(id, "player_base_px_s_x")) ? player_base_px_s_x : 420;
+    var base_y = (variable_instance_exists(id, "player_base_px_s_y")) ? player_base_px_s_y : 420;
+
+    var min_rx = (variable_instance_exists(id, "min_speed_ratio_x")) ? min_speed_ratio_x : 0.30;
+    var min_ry = (variable_instance_exists(id, "min_speed_ratio_y")) ? min_speed_ratio_y : 0.30;
+
+    var pf_x = (variable_instance_exists(id, "persp_factor_x")) ? persp_factor_x : 1.0;
+    var pf_y = (variable_instance_exists(id, "persp_factor_y")) ? persp_factor_y : 1.0;
+
+    var adj_px_s_x = lerp(base_x * pf_x * min_rx, base_x * pf_x, t);
+    var adj_px_s_y = lerp(base_y * pf_y * min_ry, base_y * pf_y, t);
+
+    var speed_x_frame = max(0.05, adj_px_s_x / max(1, room_speed));
+    var speed_y_frame = max(0.05, adj_px_s_y / max(1, room_speed));
+
+    var ux = lengthdir_x(1, ang);
+    var uy = lengthdir_y(1, ang);
+
+    stepx = ux * speed_x_frame;
+    stepy = uy * speed_y_frame;
+
+    // Overshoot clamp
+    var dx_o = target_px - x;
+    var dy_o = target_py - y;
+    var dist_o = point_distance(0, 0, dx_o, dy_o);
+    var step_len = point_distance(0, 0, stepx, stepy);
+    if (step_len > dist_o && step_len > 0) {
+        var scl = dist_o / step_len;
+        stepx *= scl;
+        stepy *= scl;
+    }
+}
+
+// ======================================
+// 4) Debug (LOG’LAR KALSIN)
+// ======================================
+show_debug_message(
+    "[DBG] idx=" + string(my_index) + "/" + string(array_length(my_points)) +
+    " has=" + string(has_target) +
+    " dist=" + (has_target ? string_format(point_distance(x,y,target_px,target_py), 0, 2) : "-") +
+    " stepx=" + string_format(stepx, 0, 2) +
+    " stepy=" + string_format(stepy, 0, 2) +
+    " paused=" + string(movement_paused)
+);
+
+// ======================================
+// 5) Hareketi uygula
+// ======================================
+if (!movement_paused) {
+    x += stepx;
+    y += stepy;
+}
+
+// ======================================
+// 6) Yön sinyali
+// ======================================
+if (has_target) {
+    if (!movement_locked) {
+        if (my_index <= 0) {
+            dir_pressed = last_dir;
+        } else {
+            var dx = target_px - x;
+            var dy = target_py - y;
+
+            var thresh_x = 16;
+            var thresh_y = 2;
+
+            if (abs(dx) > abs(dy) + thresh_x) {
+                dir_pressed = (dx < 0) ? "left" : "right";
+            }
+            else if (abs(dy) > abs(dx) + thresh_y) {
+                dir_pressed = (dy < 0) ? "up" : "down";
+            }
+            else {
+                dir_pressed = last_dir;
+            }
+        }
+    }
+} else {
+    dir_pressed = "stop";
+}
+
+last_dir = dir_pressed;
+
+// ======================================
+// INTERACTION: idle’a düşmüşsek başlat
+// ======================================
+if (interact_pending) {
+    if (is_idle_sprite(sprite_index)) {
+        start_interaction_if_possible();
+    }
+}
+
+// --- SPRITE STATE MACHINE ---
+// --- PICK animasyonu oynuyorsa ---
+if (is_pick_sprite(sprite_index)) {
+
+    // Animasyon başlarken → pickup delay ayarla
+    if (image_index == 0 && pickup_delay == 0) {
+        pickup_delay = 45; // örnek: 12 frame ≈ 0.2s @60fps
+        show_debug_message("[PICK] pickup_delay set: " + string(pickup_delay));
+    }
+
+    // Delay geri sayımı
+    if (pickup_delay > 0) {
+        pickup_delay--;
+        if (pickup_delay == 0) {
+            show_debug_message("[PICK] delay bitti → scr_player_finish_interaction()");
+            scr_player_finish_interaction();
+        }
+    }
+
+    // Animasyon bitince → idle’a dön
+    if (image_index >= image_number - 1) {
+        show_debug_message("[PICK] Animasyon bitti → idle’a dönülüyor");
+        finish_interaction();
+        global.pending_done = false;
+        pickup_delay = 0; // güvenlik için reset
+    }
+
+    // Hareket engelle
+    stepx = 0;
+    stepy = 0;
+    movement_paused = true;
+    has_target = false;
+    exit;
+}
+
+// --- BURADAN SONRASI: SPRITE STATE MACHINE ---
+// ... (senin transition/dur-idle akışın olduğu kısım burada değişmeden kalacak)
+
+// ==============================
+// 3) STATE MACHINE → (aynen kalacak)
+// ==============================
+
+if (dir_pressed != "") {
+    var old_sprite = sprite_index;
+
+ // --- STOP ---
+if (dir_pressed == "stop") {
+    // Eğer zaten idle durumundaysak ve hedef yoksa -> idle’da kal
+    if (is_idle_sprite(sprite_index) && !has_target) {
+        // hiçbir şey yapma, idle devam etsin
+    }
+    else {
+        // Diğer durumlarda normal stop → dur akışı
+        switch (sprite_index) {
+            case spr_sol: sprite_index = spr_sol_dur; break;
+            case spr_sag: sprite_index = spr_sag_dur; break;
+            case spr_ark: sprite_index = spr_ark_dur; break;
+            case spr_on:  sprite_index = spr_on_dur;  break;
+
+            case spr_soldan_saga:     sprite_index = spr_sag_dur; break;
+            case spr_soldan_arkaya:   sprite_index = spr_ark_dur; break;
+            case spr_soldan_karsiya:  sprite_index = spr_on_dur;  break;
+
+            case spr_sagdan_sola:     sprite_index = spr_sol_dur; break;
+            case spr_sagdan_arkaya:   sprite_index = spr_ark_dur; break;
+            case spr_sagdan_karsiya:  sprite_index = spr_on_dur;  break;
+
+            case spr_arkadan_sola:    sprite_index = spr_sol_dur; break;
+            case spr_arkadan_saga:    sprite_index = spr_sag_dur; break;
+            case spr_arkadan_one:     sprite_index = spr_on_dur;  break;
+
+            case spr_karsidan_sola:   sprite_index = spr_sol_dur; break;
+            case spr_karsidan_saga:   sprite_index = spr_sag_dur; break;
+            case spr_karsidan_arkaya: sprite_index = spr_ark_dur; break;
+        }
+    }
+}
+
+    // --- WALK → TRANSITION ---
+    if (sprite_index == spr_sol || sprite_index == spr_sol_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+        if (dir_pressed == "left")  sprite_index = spr_sol;
+    }
+    if (sprite_index == spr_sag || sprite_index == spr_sag_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+        if (dir_pressed == "right") sprite_index = spr_sag;
+    }
+    if (sprite_index == spr_ark || sprite_index == spr_ark_idle) {
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_ark;
+    }
+    if (sprite_index == spr_on || sprite_index == spr_on_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "down")  sprite_index = spr_on;
+    }
+
+    // --- TRANSITION → TRANSITION ---
+    if (sprite_index == spr_sagdan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+    if (sprite_index == spr_sagdan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_sagdan_karsiya) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_soldan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_soldan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_soldan_karsiya) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_karsidan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_karsidan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_karsidan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+    if (sprite_index == spr_arkadan_one) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_arkadan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_arkadan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+
+   // --- SPRITE RESET ---
+if (sprite_index != old_sprite) {
+    image_index = 0;
+    image_speed = 1;
+
+    // Transition başlarken
+    if (is_transition_sprite(sprite_index)) {
+        trans_lock_start();
+    }
+
+    // Dur sprite başlarken
+    if (sprite_index == spr_sol_dur || sprite_index == spr_sag_dur ||
+        sprite_index == spr_ark_dur || sprite_index == spr_on_dur) {
+    }
+
+    // dle sprite başlarken
+    if (sprite_index == spr_sol_idle || sprite_index == spr_sag_idle ||
+        sprite_index == spr_ark_idle || sprite_index == spr_on_idle) {
+    }
+}
+
+}
+
+// ==============================
+// 4) TRANSITION → WALK
+// ==============================
+if (sprite_index == spr_soldan_saga     && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_soldan_arkaya   && image_index >= image_number-1) sprite_index = spr_ark;
+if (sprite_index == spr_soldan_karsiya  && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_sagdan_sola     && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_sagdan_arkaya   && image_index >= image_number-1) sprite_index = spr_ark;
+if (sprite_index == spr_sagdan_karsiya  && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_arkadan_sola    && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_arkadan_saga    && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_arkadan_one     && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_karsidan_sola   && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_karsidan_saga   && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_karsidan_arkaya && image_index >= image_number-1) sprite_index = spr_ark;
+
+// ==============================
+// 5) DUR → IDLE
+// ==============================
+if (sprite_index == spr_sol_dur && image_index >= image_number-1) {
+    sprite_index = spr_sol_idle;
+}
+if (sprite_index == spr_sag_dur && image_index >= image_number-1) {
+    sprite_index = spr_sag_idle;
+}
+if (sprite_index == spr_ark_dur && image_index >= image_number-1) {
+    sprite_index = spr_ark_idle;
+}
+if (sprite_index == spr_on_dur && image_index >= image_number-1) {
+    sprite_index = spr_on_idle;
+}
+
+// --- INTERACT kilidi sayacı ---
+if (interact_lock_timer > 0) interact_lock_timer--;
+
+// Mevcut kilit mantığına etkileşim kilidini de dahil et
+movement_locked = (trans_lock_timer > 0) || (interact_lock_timer > 0);
+
+// movement_paused zaten idle/dur veya lock ile pause ediyordu, bırakalım.
+// Ama pick animasyonlarında da kesin dursun:
+var in_pick_anim = is_pick_sprite(sprite_index);
+if (in_pick_anim) movement_paused = true; // güvence
+
+"
+/// obj_player - Step (state machine öncesi, LOG’LU)
+depth = -y;
+
+// ======================================
+// 0) Varsayılanlar / kilit
+// ======================================
+var stepx = 0;
+var stepy = 0;
+var dir_pressed = "";
+
+if (trans_lock_timer > 0) trans_lock_timer--;
+
+var spr = sprite_index;
+
+// Idle/Dur check → hareketi kilitle
+var is_idle_or_dur =
+    (spr == spr_sol_idle) || (spr == spr_sag_idle) ||
+    (spr == spr_ark_idle) || (spr == spr_on_idle)  ||
+    (spr == spr_sol_dur)  || (spr == spr_sag_dur)  ||
+    (spr == spr_ark_dur)  || (spr == spr_on_dur);
+
+movement_locked = (trans_lock_timer > 0);
+movement_paused = movement_locked || is_idle_or_dur;
+
+// Eğer idle/dur’dan çıkıldıysa → tekrar başlat
+if (!is_idle_or_dur && last_was_idle_or_dur) {
+    if (!has_target) consume_waypoint();
+}
+last_was_idle_or_dur = is_idle_or_dur;
+
+// ======================================
+// Yardımcı: waypoint tüket
+// ======================================
+function consume_waypoint() {
+    var total = array_length(my_points);
+    if (my_index < total - 1) {
+        my_index++;
+        var pt = my_points[my_index];
+        
+        if (is_array(pt) && array_length(pt) >= 2) {
+            target_px  = pt[0];
+            target_py  = pt[1];
+            has_target = true;
+            show_debug_message("[PLAYER] New target → (" 
+                + string(target_px) + "," + string(target_py) 
+                + ") idx=" + string(my_index+1) + "/" + string(total));
+        } else {
+            show_debug_message("[ERR] consume_waypoint: pt array değil → " + string(pt));
+            has_target = false;
+        }
+    } else {
+        has_target = false;
+        show_debug_message("[PLAYER] Path finished.");
+    }
+}
+
+// hedefe ulaştı mı?
+if (path_position == 1 && global.pending_use != noone) {
+    if (!global.pending_done) {
+        scr_player_finish_interaction();
+        global.pending_done = true; // tekrar çalışmaz
+    }
+}
+
+// ======================================
+// 1) Hedef yoksa → yeni hedef
+// ======================================
+if (!has_target) {
+    consume_waypoint();
+
+    // Eğer ilk waypoint'teysek → otomatik atla
+    if (my_index == 0) {
+        show_debug_message("[DBG] first waypoint auto-consumed");
+        consume_waypoint();
+    }
+}
+
+// ======================================
+// 2) Hedefe varış/overshoot (yalnızca hareket serbestken)
+// ======================================
+if (has_target && !movement_paused) {
+    var dist = point_distance(x, y, target_px, target_py);
+
+    // (a) Varış
+    if (dist <= 8) {
+        consume_waypoint();
+    }
+    // (b) Overshoot
+    else if (my_index > 0 && dist > 16) {
+        var dir_now  = point_direction(x, y, target_px, target_py);
+        var dir_prev = point_direction(xprevious, yprevious, target_px, target_py);
+
+        if (abs(angle_difference(dir_now, dir_prev)) > 135) {
+            show_debug_message("[DBG] overshoot detected (idx=" + string(my_index) + ")");
+            consume_waypoint();
+        }
+    }
+}
+
+// ======================================
+// 3) Hız / step hesabı
+// ======================================
+if (has_target) {
+    var ang = point_direction(x, y, target_px, target_py);
+
+    var t = (variable_global_exists("horizon_y") && variable_global_exists("visible_height") && global.visible_height > 0)
+        ? clamp((y - global.horizon_y) / global.visible_height, 0, 1)
+        : 1.0;
+
+    var base_x = (variable_instance_exists(id, "player_base_px_s_x")) ? player_base_px_s_x : 420;
+    var base_y = (variable_instance_exists(id, "player_base_px_s_y")) ? player_base_px_s_y : 420;
+
+    var min_rx = (variable_instance_exists(id, "min_speed_ratio_x")) ? min_speed_ratio_x : 0.30;
+    var min_ry = (variable_instance_exists(id, "min_speed_ratio_y")) ? min_speed_ratio_y : 0.30;
+
+    var pf_x = (variable_instance_exists(id, "persp_factor_x")) ? persp_factor_x : 1.0;
+    var pf_y = (variable_instance_exists(id, "persp_factor_y")) ? persp_factor_y : 1.0;
+
+    var adj_px_s_x = lerp(base_x * pf_x * min_rx, base_x * pf_x, t);
+    var adj_px_s_y = lerp(base_y * pf_y * min_ry, base_y * pf_y, t);
+
+    var speed_x_frame = max(0.05, adj_px_s_x / max(1, room_speed));
+    var speed_y_frame = max(0.05, adj_px_s_y / max(1, room_speed));
+
+    var ux = lengthdir_x(1, ang);
+    var uy = lengthdir_y(1, ang);
+
+    stepx = ux * speed_x_frame;
+    stepy = uy * speed_y_frame;
+
+    // Overshoot clamp
+    var dx_o = target_px - x;
+    var dy_o = target_py - y;
+    var dist_o = point_distance(0, 0, dx_o, dy_o);
+    var step_len = point_distance(0, 0, stepx, stepy);
+    if (step_len > dist_o && step_len > 0) {
+        var scl = dist_o / step_len;
+        stepx *= scl;
+        stepy *= scl;
+    }
+}
+
+// ======================================
+// 4) Debug (LOG’LAR KALSIN)
+// ======================================
+show_debug_message(
+    "[DBG] idx=" + string(my_index) + "/" + string(array_length(my_points)) +
+    " has=" + string(has_target) +
+    " dist=" + (has_target ? string_format(point_distance(x,y,target_px,target_py), 0, 2) : "-") +
+    " stepx=" + string_format(stepx, 0, 2) +
+    " stepy=" + string_format(stepy, 0, 2) +
+    " paused=" + string(movement_paused)
+);
+
+// ======================================
+// 5) Hareketi uygula
+// ======================================
+if (!movement_paused) {
+    x += stepx;
+    y += stepy;
+}
+
+// ======================================
+// 6) Yön sinyali
+// ======================================
+if (has_target) {
+    if (!movement_locked) {
+        if (my_index <= 0) {
+            dir_pressed = last_dir;
+        } else {
+            var dx = target_px - x;
+            var dy = target_py - y;
+
+            var thresh_x = 16;
+            var thresh_y = 2;
+
+            if (abs(dx) > abs(dy) + thresh_x) {
+                dir_pressed = (dx < 0) ? "left" : "right";
+            }
+            else if (abs(dy) > abs(dx) + thresh_y) {
+                dir_pressed = (dy < 0) ? "up" : "down";
+            }
+            else {
+                dir_pressed = last_dir;
+            }
+        }
+    }
+} else {
+    dir_pressed = "stop";
+}
+
+last_dir = dir_pressed;
+
+// ======================================
+// INTERACTION: idle’a düşmüşsek başlat
+// ======================================
+if (interact_pending) {
+    if (is_idle_sprite(sprite_index)) {
+        start_interaction_if_possible();
+    }
+}
+
+// --- SPRITE STATE MACHINE ---
+// --- PICK animasyonu oynuyorsa ---
+if (is_pick_sprite(sprite_index)) {
+
+    // Animasyon başlarken → pickup delay ayarla
+    if (image_index == 0 && pickup_delay == 0) {
+        pickup_delay = 45; // örnek: 12 frame ≈ 0.2s l5696226F_0
+        show_debug_message("[PICK] pickup_delay set: " + string(pickup_delay));
+    }
+
+    // Delay geri sayımı
+    if (pickup_delay > 0) {
+        pickup_delay--;
+        if (pickup_delay == 0) {
+            show_debug_message("[PICK] delay bitti → scr_player_finish_interaction()");
+            scr_player_finish_interaction();
+        }
+    }
+
+    // Animasyon bitince → idle’a dön
+    if (image_index >= image_number - 1) {
+        show_debug_message("[PICK] Animasyon bitti → idle’a dönülüyor");
+        finish_interaction();
+        global.pending_done = false;
+        pickup_delay = 0; // güvenlik için reset
+    }
+
+    // Hareket engelle
+    stepx = 0;
+    stepy = 0;
+    movement_paused = true;
+    has_target = false;
+    exit;
+}
+
+// --- BURADAN SONRASI: SPRITE STATE MACHINE ---
+// ... (senin transition/dur-idle akışın olduğu kısım burada değişmeden kalacak)
+
+// ==============================
+// 3) STATE MACHINE → (aynen kalacak)
+// ==============================
+
+if (dir_pressed != "") {
+    var old_sprite = sprite_index;
+
+ // --- STOP ---
+if (dir_pressed == "stop") {
+    // Eğer zaten idle durumundaysak ve hedef yoksa -> idle’da kal
+    if (is_idle_sprite(sprite_index) && !has_target) {
+        // hiçbir şey yapma, idle devam etsin
+    }
+    else {
+        // Diğer durumlarda normal stop → dur akışı
+        switch (sprite_index) {
+            case spr_sol: sprite_index = spr_sol_dur; break;
+            case spr_sag: sprite_index = spr_sag_dur; break;
+            case spr_ark: sprite_index = spr_ark_dur; break;
+            case spr_on:  sprite_index = spr_on_dur;  break;
+
+            case spr_soldan_saga:     sprite_index = spr_sag_dur; break;
+            case spr_soldan_arkaya:   sprite_index = spr_ark_dur; break;
+            case spr_soldan_karsiya:  sprite_index = spr_on_dur;  break;
+
+            case spr_sagdan_sola:     sprite_index = spr_sol_dur; break;
+            case spr_sagdan_arkaya:   sprite_index = spr_ark_dur; break;
+            case spr_sagdan_karsiya:  sprite_index = spr_on_dur;  break;
+
+            case spr_arkadan_sola:    sprite_index = spr_sol_dur; break;
+            case spr_arkadan_saga:    sprite_index = spr_sag_dur; break;
+            case spr_arkadan_one:     sprite_index = spr_on_dur;  break;
+
+            case spr_karsidan_sola:   sprite_index = spr_sol_dur; break;
+            case spr_karsidan_saga:   sprite_index = spr_sag_dur; break;
+            case spr_karsidan_arkaya: sprite_index = spr_ark_dur; break;
+        }
+    }
+}
+
+    // --- WALK → TRANSITION ---
+    if (sprite_index == spr_sol || sprite_index == spr_sol_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+        if (dir_pressed == "left")  sprite_index = spr_sol;
+    }
+    if (sprite_index == spr_sag || sprite_index == spr_sag_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+        if (dir_pressed == "right") sprite_index = spr_sag;
+    }
+    if (sprite_index == spr_ark || sprite_index == spr_ark_idle) {
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_ark;
+    }
+    if (sprite_index == spr_on || sprite_index == spr_on_idle) {
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "down")  sprite_index = spr_on;
+    }
+
+    // --- TRANSITION → TRANSITION ---
+    if (sprite_index == spr_sagdan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+    if (sprite_index == spr_sagdan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_sagdan_karsiya) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_soldan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_soldan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_soldan_karsiya) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_karsidan_arkaya) {
+        if (dir_pressed == "left")  sprite_index = spr_arkadan_sola;
+        if (dir_pressed == "right") sprite_index = spr_arkadan_saga;
+        if (dir_pressed == "down")  sprite_index = spr_arkadan_one;
+    }
+    if (sprite_index == spr_karsidan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_karsidan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+    if (sprite_index == spr_arkadan_one) {
+        if (dir_pressed == "left")  sprite_index = spr_karsidan_sola;
+        if (dir_pressed == "right") sprite_index = spr_karsidan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_karsidan_arkaya;
+    }
+    if (sprite_index == spr_arkadan_saga) {
+        if (dir_pressed == "left")  sprite_index = spr_sagdan_sola;
+        if (dir_pressed == "up")    sprite_index = spr_sagdan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_sagdan_karsiya;
+    }
+    if (sprite_index == spr_arkadan_sola) {
+        if (dir_pressed == "right") sprite_index = spr_soldan_saga;
+        if (dir_pressed == "up")    sprite_index = spr_soldan_arkaya;
+        if (dir_pressed == "down")  sprite_index = spr_soldan_karsiya;
+    }
+
+   // --- SPRITE RESET ---
+if (sprite_index != old_sprite) {
+    image_index = 0;
+    image_speed = 1;
+
+    // Transition başlarken
+    if (is_transition_sprite(sprite_index)) {
+        trans_lock_start();
+    }
+
+    // Dur sprite başlarken
+    if (sprite_index == spr_sol_dur || sprite_index == spr_sag_dur ||
+        sprite_index == spr_ark_dur || sprite_index == spr_on_dur) {
+    }
+
+    // dle sprite başlarken
+    if (sprite_index == spr_sol_idle || sprite_index == spr_sag_idle ||
+        sprite_index == spr_ark_idle || sprite_index == spr_on_idle) {
+    }
+}
+
+}
+
+// ==============================
+// 4) TRANSITION → WALK
+// ==============================
+if (sprite_index == spr_soldan_saga     && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_soldan_arkaya   && image_index >= image_number-1) sprite_index = spr_ark;
+if (sprite_index == spr_soldan_karsiya  && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_sagdan_sola     && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_sagdan_arkaya   && image_index >= image_number-1) sprite_index = spr_ark;
+if (sprite_index == spr_sagdan_karsiya  && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_arkadan_sola    && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_arkadan_saga    && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_arkadan_one     && image_index >= image_number-1) sprite_index = spr_on;
+if (sprite_index == spr_karsidan_sola   && image_index >= image_number-1) sprite_index = spr_sol;
+if (sprite_index == spr_karsidan_saga   && image_index >= image_number-1) sprite_index = spr_sag;
+if (sprite_index == spr_karsidan_arkaya && image_index >= image_number-1) sprite_index = spr_ark;
+
+// ==============================
+// 5) DUR → IDLE
+// ==============================
+if (sprite_index == spr_sol_dur && image_index >= image_number-1) {
+    sprite_index = spr_sol_idle;
+}
+if (sprite_index == spr_sag_dur && image_index >= image_number-1) {
+    sprite_index = spr_sag_idle;
+}
+if (sprite_index == spr_ark_dur && image_index >= image_number-1) {
+    sprite_index = spr_ark_idle;
+}
+if (sprite_index == spr_on_dur && image_index >= image_number-1) {
+    sprite_index = spr_on_idle;
+}
+
+// --- INTERACT kilidi sayacı ---
+if (interact_lock_timer > 0) interact_lock_timer--;
+
+// Mevcut kilit mantığına etkileşim kilidini de dahil et
+movement_locked = (trans_lock_timer > 0) || (interact_lock_timer > 0);
+
+// movement_paused zaten idle/dur veya lock ile pause ediyordu, bırakalım.
+// Ama pick animasyonlarında da kesin dursun:
+var in_pick_anim = is_pick_sprite(sprite_index);
+if (in_pick_anim) movement_paused = true; // güvence
